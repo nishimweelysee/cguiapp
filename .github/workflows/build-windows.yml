@@ -31,19 +31,23 @@ jobs:
         run: |
           # Convert Windows path D:\a\cguiapp\cguiapp to /d/a/cguiapp/cguiapp
           WIN_PATH="${{ github.workspace }}"
-          # Extract drive letter and convert to lowercase
-          DRIVE=$(echo "$WIN_PATH" | cut -d: -f1 | tr '[:upper:]' '[:lower:]')
-          # Extract path part (everything after :)
-          PATH_PART=$(echo "$WIN_PATH" | cut -d: -f2-)
-          # Convert backslashes to forward slashes
-          PATH_PART=$(echo "$PATH_PART" | sed 's|\\|/|g')
-          # Remove leading backslash if present, then ensure it starts with /
-          PATH_PART=$(echo "$PATH_PART" | sed 's|^\\||')
-          if [ "${PATH_PART:0:1}" != "/" ]; then
-            PATH_PART="/$PATH_PART"
+          # Convert Windows path: D:\a\cguiapp\cguiapp -> /d/a/cguiapp/cguiapp
+          # Method: Replace D: with /d, then convert all \ to /
+          MSYS_PATH=$(echo "$WIN_PATH" | sed 's/^\([A-Z]\):/\/\1/' | tr '[:upper:]' '[:lower:]' | sed 's|\\|/|g')
+          # If conversion failed, try alternative method
+          if [ ! -d "$MSYS_PATH" ]; then
+            echo "First conversion failed, trying alternative..."
+            DRIVE=$(echo "$WIN_PATH" | cut -d: -f1 | tr '[:upper:]' '[:lower:]')
+            PATH_PART=$(echo "$WIN_PATH" | cut -d: -f2)
+            # Convert \a\b\c to /a/b/c
+            PATH_PART=$(echo "$PATH_PART" | sed 's|\\|/|g')
+            # Ensure it starts with /
+            if [ "${PATH_PART#/}" = "$PATH_PART" ]; then
+              PATH_PART="/$PATH_PART"
+            fi
+            MSYS_PATH="/$DRIVE$PATH_PART"
           fi
-          MSYS_PATH="/$DRIVE$PATH_PART"
-          echo "Debug: DRIVE=$DRIVE, PATH_PART=$PATH_PART, MSYS_PATH=$MSYS_PATH"
+          echo "Converting: $WIN_PATH -> $MSYS_PATH"
           echo "Converting: $WIN_PATH -> $MSYS_PATH"
           cd "$MSYS_PATH" || {
             echo "Failed to cd to $MSYS_PATH"
