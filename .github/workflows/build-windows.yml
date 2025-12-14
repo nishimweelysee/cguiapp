@@ -163,6 +163,7 @@ jobs:
           refreshenv
 
       - name: Create Installer
+        shell: cmd
         run: |
           if exist StockManagement_Installer_WithGTK.iss (
             "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" StockManagement_Installer_WithGTK.iss
