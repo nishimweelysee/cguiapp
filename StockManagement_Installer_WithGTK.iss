@@ -43,8 +43,8 @@ Source: "bin\*.dll"; DestDir: "{app}"; Flags: ignoreversion
 ; GTK data files (themes, icons, etc.)
 Source: "bin\share\*"; DestDir: "{app}\share"; Flags: ignoreversion recursesubdirs createallsubdirs
 
-; Application data folder (will be created by app automatically)
-Source: "bin\data\*"; DestDir: "{app}\data"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Application data folder (will be created by app automatically - optional)
+; Note: This folder may be empty, so we don't copy it - app will create it
 
 [Icons]
 Name: "{group}\Stock Management System"; Filename: "{app}\stock_management.exe"
