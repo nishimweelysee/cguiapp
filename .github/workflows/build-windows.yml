@@ -29,12 +29,19 @@ jobs:
       - name: Build Application
         shell: C:\tools\msys64\usr\bin\bash.exe -l {0}
         run: |
-          # Convert Windows path to MSYS2 path: D:\a\cguiapp\cguiapp -> /d/a/cguiapp/cguiapp
-          WIN_PATH="${{ github.workspace }}"
-          MSYS_PATH="/$(echo "$WIN_PATH" | sed 's/^\([A-Za-z]\):/\/\L\1/' | sed 's/\\/\//g' | sed 's/://')"
-          cd "$MSYS_PATH"
+          # MSYS2 automatically converts Windows paths, but we need to handle it explicitly
+          # Use the workspace environment variable and convert properly
+          cd "${{ github.workspace }}"
+          # If that doesn't work, try manual conversion
+          if [ ! -d src ]; then
+            WIN_PATH="${{ github.workspace }}"
+            # Convert D:\path\to\dir to /d/path/to/dir
+            DRIVE=$(echo "$WIN_PATH" | cut -d: -f1 | tr '[:upper:]' '[:lower:]')
+            PATH_PART=$(echo "$WIN_PATH" | cut -d: -f2 | sed 's/\\/\//g' | sed 's/^\/\///')
+            cd "/$DRIVE$PATH_PART"
+          fi
           echo "Current directory: $(pwd)"
-          echo "Files in directory:"
+          echo "Listing files:"
           ls -la
           mkdir -p bin obj data
           export PATH="/mingw64/bin:$PATH"
@@ -47,10 +54,15 @@ jobs:
       - name: Bundle DLLs
         shell: C:\tools\msys64\usr\bin\bash.exe -l {0}
         run: |
-          # Convert Windows path to MSYS2 path
-          WIN_PATH="${{ github.workspace }}"
-          MSYS_PATH="/$(echo "$WIN_PATH" | sed 's/^\([A-Za-z]\):/\/\L\1/' | sed 's/\\/\//g' | sed 's/://')"
-          cd "$MSYS_PATH"
+          # Navigate to workspace
+          cd "${{ github.workspace }}"
+          # If that doesn't work, convert path manually
+          if [ ! -d bin ]; then
+            WIN_PATH="${{ github.workspace }}"
+            DRIVE=$(echo "$WIN_PATH" | cut -d: -f1 | tr '[:upper:]' '[:lower:]')
+            PATH_PART=$(echo "$WIN_PATH" | cut -d: -f2 | sed 's/\\/\//g' | sed 's/^\/\///')
+            cd "/$DRIVE$PATH_PART"
+          fi
           MSYS2_BIN=/mingw64/bin
 
           # Copy essential DLLs
