@@ -29,20 +29,20 @@ jobs:
       - name: Build Application
         shell: C:\tools\msys64\usr\bin\bash.exe -l {0}
         run: |
-          # MSYS2 automatically converts Windows paths, but we need to handle it explicitly
-          # Use the workspace environment variable and convert properly
-          cd "${{ github.workspace }}"
-          # If that doesn't work, try manual conversion
-          if [ ! -d src ]; then
-            WIN_PATH="${{ github.workspace }}"
-            # Convert D:\path\to\dir to /d/path/to/dir
-            DRIVE=$(echo "$WIN_PATH" | cut -d: -f1 | tr '[:upper:]' '[:lower:]')
-            PATH_PART=$(echo "$WIN_PATH" | cut -d: -f2 | sed 's/\\/\//g' | sed 's/^\/\///')
-            cd "/$DRIVE$PATH_PART"
-          fi
+          # Convert Windows path D:\a\cguiapp\cguiapp to /d/a/cguiapp/cguiapp
+          WIN_PATH="${{ github.workspace }}"
+          DRIVE=$(echo "$WIN_PATH" | cut -d: -f1 | tr '[:upper:]' '[:lower:]')
+          PATH_PART=$(echo "$WIN_PATH" | cut -d: -f2 | sed 's/\\/\//g')
+          # Remove leading slash if present to avoid double slash
+          PATH_PART=$(echo "$PATH_PART" | sed 's|^/||')
+          MSYS_PATH="/$DRIVE$PATH_PART"
+          echo "Converting: $WIN_PATH -> $MSYS_PATH"
+          cd "$MSYS_PATH"
           echo "Current directory: $(pwd)"
           echo "Listing files:"
           ls -la
+          echo "Checking for src directory:"
+          ls -la src/ || echo "src directory not found!"
           mkdir -p bin obj data
           export PATH="/mingw64/bin:$PATH"
           echo "Building application..."
@@ -54,15 +54,13 @@ jobs:
       - name: Bundle DLLs
         shell: C:\tools\msys64\usr\bin\bash.exe -l {0}
         run: |
-          # Navigate to workspace
-          cd "${{ github.workspace }}"
-          # If that doesn't work, convert path manually
-          if [ ! -d bin ]; then
-            WIN_PATH="${{ github.workspace }}"
-            DRIVE=$(echo "$WIN_PATH" | cut -d: -f1 | tr '[:upper:]' '[:lower:]')
-            PATH_PART=$(echo "$WIN_PATH" | cut -d: -f2 | sed 's/\\/\//g' | sed 's/^\/\///')
-            cd "/$DRIVE$PATH_PART"
-          fi
+          # Convert Windows path to MSYS2 path
+          WIN_PATH="${{ github.workspace }}"
+          DRIVE=$(echo "$WIN_PATH" | cut -d: -f1 | tr '[:upper:]' '[:lower:]')
+          PATH_PART=$(echo "$WIN_PATH" | cut -d: -f2 | sed 's/\\/\//g')
+          PATH_PART=$(echo "$PATH_PART" | sed 's|^/||')
+          MSYS_PATH="/$DRIVE$PATH_PART"
+          cd "$MSYS_PATH"
           MSYS2_BIN=/mingw64/bin
 
           # Copy essential DLLs
