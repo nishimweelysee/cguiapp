@@ -29,7 +29,8 @@ jobs:
       - name: Build Application
         shell: C:\tools\msys64\usr\bin\bash.exe -l {0}
         run: |
-          cd /$(echo ${{ github.workspace }} | sed 's/://' | sed 's/\\/\//g')
+          WORKSPACE=$(cygpath -u "${{ github.workspace }}")
+          cd "$WORKSPACE"
           mkdir -p bin obj data
           export PATH="/mingw64/bin:$PATH"
           gcc -Wall -Wextra -std=c11 -mwindows \
@@ -40,7 +41,8 @@ jobs:
       - name: Bundle DLLs
         shell: C:\tools\msys64\usr\bin\bash.exe -l {0}
         run: |
-          cd /$(echo ${{ github.workspace }} | sed 's/://' | sed 's/\\/\//g')
+          WORKSPACE=$(cygpath -u "${{ github.workspace }}")
+          cd "$WORKSPACE"
           MSYS2_BIN=/mingw64/bin
 
           # Copy essential DLLs
@@ -81,7 +83,7 @@ jobs:
 
           # Create data folder
           mkdir -p bin/data
-          
+
           # Compile schemas if glib-compile-schemas exists
           if [ -f /mingw64/bin/glib-compile-schemas.exe ] && [ -d bin/share/glib-2.0/schemas ]; then
             /mingw64/bin/glib-compile-schemas.exe bin/share/glib-2.0/schemas 2>/dev/null || true
