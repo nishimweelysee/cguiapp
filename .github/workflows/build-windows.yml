@@ -77,7 +77,7 @@ jobs:
           if not exist data mkdir data
 
       - name: Upload Standalone Package
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: StockManagement-Windows-Standalone
           path: bin/*
@@ -98,7 +98,7 @@ jobs:
           fi
 
       - name: Upload Installer
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: StockManagement-Installer
           path: installer/*.exe
