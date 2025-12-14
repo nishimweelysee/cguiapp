@@ -33,13 +33,17 @@ jobs:
           WIN_PATH="${{ github.workspace }}"
           # Extract drive letter and convert to lowercase
           DRIVE=$(echo "$WIN_PATH" | cut -d: -f1 | tr '[:upper:]' '[:lower:]')
-          # Extract path part and convert backslashes to forward slashes
-          PATH_PART=$(echo "$WIN_PATH" | cut -d: -f2 | sed 's|\\|/|g')
-          # Ensure path starts with /
+          # Extract path part (everything after :)
+          PATH_PART=$(echo "$WIN_PATH" | cut -d: -f2-)
+          # Convert backslashes to forward slashes
+          PATH_PART=$(echo "$PATH_PART" | sed 's|\\|/|g')
+          # Remove leading backslash if present, then ensure it starts with /
+          PATH_PART=$(echo "$PATH_PART" | sed 's|^\\||')
           if [ "${PATH_PART:0:1}" != "/" ]; then
             PATH_PART="/$PATH_PART"
           fi
           MSYS_PATH="/$DRIVE$PATH_PART"
+          echo "Debug: DRIVE=$DRIVE, PATH_PART=$PATH_PART, MSYS_PATH=$MSYS_PATH"
           echo "Converting: $WIN_PATH -> $MSYS_PATH"
           cd "$MSYS_PATH" || {
             echo "Failed to cd to $MSYS_PATH"
@@ -130,10 +134,17 @@ jobs:
           fi
 
       - name: Create Standalone Package
+        shell: C:\tools\msys64\usr\bin\bash.exe -l {0}
         run: |
-          cd bin
-          if not exist share mkdir share
-          if not exist data mkdir data
+          WIN_PATH="${{ github.workspace }}"
+          DRIVE=$(echo "$WIN_PATH" | cut -d: -f1 | tr '[:upper:]' '[:lower:]')
+          PATH_PART=$(echo "$WIN_PATH" | cut -d: -f2- | sed 's|\\|/|g' | sed 's|^\\||')
+          if [ "${PATH_PART:0:1}" != "/" ]; then
+            PATH_PART="/$PATH_PART"
+          fi
+          MSYS_PATH="/$DRIVE$PATH_PART"
+          cd "$MSYS_PATH/bin"
+          mkdir -p share data
 
       - name: Upload Standalone Package
         uses: actions/upload-artifact@v4
