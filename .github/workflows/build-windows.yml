@@ -31,24 +31,26 @@ jobs:
         run: |
           # Convert Windows path D:\a\cguiapp\cguiapp to /d/a/cguiapp/cguiapp
           WIN_PATH="${{ github.workspace }}"
+          # Extract drive letter and convert to lowercase
           DRIVE=$(echo "$WIN_PATH" | cut -d: -f1 | tr '[:upper:]' '[:lower:]')
-          PATH_PART=$(echo "$WIN_PATH" | cut -d: -f2 | sed 's/\\/\//g')
-          # Ensure path starts with / (remove leading backslash, add forward slash)
-          PATH_PART=$(echo "$PATH_PART" | sed 's|^\\||' | sed 's|^/|/|')
+          # Extract path part and convert backslashes to forward slashes
+          PATH_PART=$(echo "$WIN_PATH" | cut -d: -f2 | sed 's|\\|/|g')
+          # Ensure path starts with /
           if [ "${PATH_PART:0:1}" != "/" ]; then
             PATH_PART="/$PATH_PART"
           fi
           MSYS_PATH="/$DRIVE$PATH_PART"
           echo "Converting: $WIN_PATH -> $MSYS_PATH"
           cd "$MSYS_PATH" || {
-            echo "Failed to cd to $MSYS_PATH, trying alternative..."
-            # Alternative: use cygpath if available
+            echo "Failed to cd to $MSYS_PATH"
+            echo "Trying cygpath..."
             if command -v cygpath &> /dev/null; then
               MSYS_PATH=$(cygpath -u "$WIN_PATH")
-              cd "$MSYS_PATH"
+              echo "cygpath result: $MSYS_PATH"
+              cd "$MSYS_PATH" || exit 1
             else
-              # Last resort: try direct Windows path
-              cd "$WIN_PATH"
+              echo "ERROR: Cannot convert path $WIN_PATH"
+              exit 1
             fi
           }
           echo "Current directory: $(pwd)"
