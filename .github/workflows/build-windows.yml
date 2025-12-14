@@ -29,8 +29,9 @@ jobs:
       - name: Build Application
         shell: C:\tools\msys64\usr\bin\bash.exe -l {0}
         run: |
-          WORKSPACE=$(cygpath -u "${{ github.workspace }}")
-          cd "$WORKSPACE"
+          cd /$(echo "${{ github.workspace }}" | sed 's/^\([A-Z]\):/\/\L\1/' | sed 's/\\/\//g')
+          pwd
+          ls -la
           mkdir -p bin obj data
           export PATH="/mingw64/bin:$PATH"
           gcc -Wall -Wextra -std=c11 -mwindows \
@@ -41,8 +42,7 @@ jobs:
       - name: Bundle DLLs
         shell: C:\tools\msys64\usr\bin\bash.exe -l {0}
         run: |
-          WORKSPACE=$(cygpath -u "${{ github.workspace }}")
-          cd "$WORKSPACE"
+          cd /$(echo "${{ github.workspace }}" | sed 's/^\([A-Z]\):/\/\L\1/' | sed 's/\\/\//g')
           MSYS2_BIN=/mingw64/bin
 
           # Copy essential DLLs
