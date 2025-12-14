@@ -1,0 +1,85 @@
+========================================
+TRUE SINGLE-FILE EXECUTABLE
+(Just Double-Click - Nothing Else!)
+========================================
+
+GOAL: ONE .exe file that users just double-click
+
+========================================
+METHOD: Enigma Virtual Box (Best)
+========================================
+
+Step 1: Build package
+   ./build_standalone.bat
+
+Step 2: Download Enigma Virtual Box
+   https://enigmaprotector.com/en/downloads.html
+   (Free, portable, no installation)
+
+Step 3: Open Enigma Virtual Box
+
+Step 4: Configure:
+   - Virtual Box File Name: StockManagement.exe
+   - Files: Add ENTIRE "bin" folder
+   - Executable: bin\stock_management.exe
+   - Run Executable: CHECK
+   - Extract to Temp: CHECK
+
+Step 5: Click "Process"
+
+Step 6: Done!
+   Result: StockManagement.exe (ONE file!)
+
+========================================
+RESULT
+========================================
+
+ONE file: StockManagement.exe
+
+Users just:
+   1. Double-click StockManagement.exe
+   2. Done! ✅
+
+No installation
+No setup
+No DLLs visible
+No folders
+Nothing else!
+
+========================================
+ALTERNATIVE: 7-Zip SFX
+========================================
+
+If Enigma doesn't work:
+
+   ./build_standalone.bat
+   ./create_sfx_7zip.bat
+
+Result: StockManagement.exe
+(May show brief extraction window)
+
+========================================
+FILE SIZE
+========================================
+
+Expect: ~50-100 MB
+(Contains all DLLs and data files)
+
+========================================
+TESTING
+========================================
+
+1. Double-click StockManagement.exe
+2. Should run immediately!
+3. Test on clean Windows machine
+
+========================================
+SUMMARY
+========================================
+
+Build: ./build_standalone.bat
+Bundle: Use Enigma Virtual Box
+Result: ONE .exe file
+Users: Just double-click!
+
+========================================

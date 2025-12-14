@@ -1,0 +1,83 @@
+========================================
+QUICK GUIDE: Create Windows Installer
+========================================
+
+GOAL: Single installer .exe that installs everything and runs the app
+
+========================================
+STEP 1: Install Inno Setup
+========================================
+
+Download and install:
+https://jrsoftware.org/isdl.php
+
+(Free, no registration needed)
+
+========================================
+STEP 2: Build Installer
+========================================
+
+On Windows, run:
+
+   ./BUILD_INSTALLER.bat
+
+This does everything automatically!
+
+OR step by step:
+
+   ./build_standalone.bat
+   ./create_installer.bat
+
+========================================
+RESULT
+========================================
+
+File: installer\StockManagement_Installer.exe
+
+This is your installer!
+
+========================================
+FOR USERS
+========================================
+
+They just:
+
+1. Double-click StockManagement_Installer.exe
+2. Click "Next" through wizard
+3. App installs and runs automatically!
+
+No scripts, no .bat files, nothing else!
+
+========================================
+WHAT THE INSTALLER DOES
+========================================
+
+✅ Installs application to Program Files
+✅ Installs all required DLLs
+✅ Installs GTK data files
+✅ Creates desktop shortcut
+✅ Creates Start Menu shortcut
+✅ Runs app after installation
+✅ Creates uninstaller
+
+========================================
+TESTING
+========================================
+
+1. Run installer on your machine
+2. Verify app runs
+3. Test on clean Windows machine
+4. Ready to distribute!
+
+========================================
+ALTERNATIVES
+========================================
+
+If Inno Setup doesn't work:
+
+- NSIS (free): https://nsis.sourceforge.io/
+- WiX Toolset: https://wixtoolset.org/
+
+See INSTALLER_GUIDE.md for details
+
+========================================

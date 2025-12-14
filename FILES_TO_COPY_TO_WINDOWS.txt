@@ -1,0 +1,115 @@
+========================================
+FILES TO COPY TO WINDOWS
+========================================
+
+ESSENTIAL FILES (Required for Building):
+----------------------------------------
+
+📁 src/ folder (ALL files):
+   ✅ file_io.c
+   ✅ file_io.h
+   ✅ gui_dialogs.c
+   ✅ gui_dialogs.h
+   ✅ gui_main.c
+   ✅ gui_main.h
+   ✅ main.c
+   ✅ product.c
+   ✅ product.h
+   ✅ validation.c
+   ✅ validation.h
+
+📄 Build Scripts:
+   ✅ build_windows.bat
+   ✅ build_standalone.bat
+   ✅ bundle_dlls.bat
+   ✅ BUILD_SINGLE_EXE.bat (if creating single .exe)
+   ✅ create_sfx_7zip.bat (if using 7-Zip method)
+
+📄 Makefile (optional):
+   ✅ Makefile.windows
+
+========================================
+OPTIONAL FILES (Helpful but not required):
+----------------------------------------
+
+📄 Documentation (helpful for reference):
+   - BUILD_FOR_DISTRIBUTION.md
+   - SINGLE_EXE_GUIDE.md
+   - QUICK_BUILD_GUIDE.txt
+   - README.md
+
+📄 Verification:
+   - verify_package.bat
+
+========================================
+FILES YOU DON'T NEED TO COPY:
+----------------------------------------
+
+❌ bin/ folder (will be created during build)
+❌ obj/ folder (will be created during build)
+❌ .DS_Store (macOS system file)
+❌ *.sh files (Linux/Mac scripts)
+❌ Makefile (Linux version)
+❌ PDF files
+❌ PNG images
+❌ Any documentation you don't need
+
+========================================
+MINIMUM FILES NEEDED:
+----------------------------------------
+
+If you want the absolute minimum:
+
+1. src/ folder (all .c and .h files)
+2. build_standalone.bat
+3. build_windows.bat
+4. bundle_dlls.bat
+
+That's it! Everything else is optional.
+
+========================================
+HOW TO COPY:
+----------------------------------------
+
+Option 1: Copy Entire Project Folder
+   - Copy the whole Cexamwinne folder
+   - Then delete unnecessary files on Windows
+
+Option 2: Copy Only What You Need
+   - Create new folder on Windows
+   - Copy src/ folder
+   - Copy build scripts (.bat files)
+   - Copy Makefile.windows (optional)
+
+Option 3: Use ZIP
+   - Zip src/ folder + build scripts
+   - Transfer ZIP file
+   - Extract on Windows
+
+========================================
+RECOMMENDED: Copy These Folders/Files
+----------------------------------------
+
+📁 src/                    (entire folder)
+📁 (create empty folders)  bin/, obj/, data/
+📄 build_windows.bat
+📄 build_standalone.bat
+📄 bundle_dlls.bat
+📄 BUILD_SINGLE_EXE.bat
+📄 create_sfx_7zip.bat
+📄 Makefile.windows
+
+========================================
+QUICK CHECKLIST:
+----------------------------------------
+
+Before building on Windows, verify you have:
+
+[ ] src/ folder with all .c and .h files
+[ ] build_standalone.bat
+[ ] build_windows.bat
+[ ] bundle_dlls.bat
+
+If any missing, copy from macOS!
+
+========================================

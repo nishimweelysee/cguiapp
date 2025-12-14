@@ -1,0 +1,85 @@
+========================================
+QUICK BUILD GUIDE - STANDALONE PACKAGE
+========================================
+
+GOAL: Build app that runs on ANY Windows laptop without installation
+
+========================================
+STEP 1: ON WINDOWS MACHINE
+========================================
+
+1. Open "MSYS2 MinGW 64-bit" terminal (NOT regular CMD!)
+
+2. Navigate to project:
+   cd /c/path/to/Cexamwinne
+
+3. Install GTK (if needed):
+   pacman -S mingw-w64-x86_64-gtk3 mingw-w64-x86_64-pkg-config
+
+4. Build standalone package:
+   ./build_standalone.bat
+
+5. Wait for "READY TO USE!" message
+
+========================================
+STEP 2: VERIFY PACKAGE
+========================================
+
+Run verification:
+   ./verify_package.bat
+
+Should show: "Package is ready to distribute!"
+
+========================================
+STEP 3: PACKAGE FOR DISTRIBUTION
+========================================
+
+1. Go to the 'bin' folder
+2. Select all files and folders
+3. Right-click → Send to → Compressed folder
+4. Name it: StockManagement_Standalone.zip
+
+========================================
+STEP 4: TEST BEFORE DISTRIBUTING
+========================================
+
+IMPORTANT: Test on clean Windows machine first!
+
+1. Copy bin folder to USB
+2. Test on Windows WITHOUT GTK installed
+3. Double-click stock_management.exe
+4. If it works → Ready to distribute!
+
+========================================
+STEP 5: DISTRIBUTE
+========================================
+
+Give them:
+- The ZIP file (StockManagement_Standalone.zip)
+- README_FOR_DISTRIBUTION.txt (optional but helpful)
+
+They just:
+1. Extract ZIP
+2. Double-click stock_management.exe
+3. Done! ✅
+
+========================================
+TROUBLESHOOTING
+========================================
+
+If build fails:
+- Make sure you're in MSYS2 MinGW terminal
+- Install GTK: pacman -S mingw-w64-x86_64-gtk3
+
+If DLL errors:
+- Run: ./bundle_dlls.bat
+- Then: ./verify_package.bat
+
+========================================
+THAT'S IT!
+========================================
+
+One command: ./build_standalone.bat
+Then zip the bin folder and distribute!
+
+========================================

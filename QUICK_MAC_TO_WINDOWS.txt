@@ -1,0 +1,94 @@
+========================================
+BUILD WINDOWS INSTALLER FROM MAC
+========================================
+
+GOAL: Single installer .exe that installs everything automatically
+
+========================================
+WHAT YOU GET
+========================================
+
+ONE file: StockManagement_Installer.exe
+
+Users just:
+  1. Double-click installer
+  2. Click "Next" through wizard
+  3. App installs and runs automatically!
+
+No scripts, no manual steps!
+
+========================================
+HOW TO BUILD FROM MAC
+========================================
+
+Step 1: Run the build script
+   ./build_installer_from_mac.sh
+
+Step 2: Push to GitHub (if not already done)
+   git add .
+   git commit -m "Build installer"
+   git push origin main
+
+Step 3: Wait for GitHub Actions (~5-10 minutes)
+   - Go to GitHub → Actions tab
+   - Watch the build progress
+
+Step 4: Download installer
+   - GitHub → Actions → Latest workflow
+   - Click "Artifacts"
+   - Download "StockManagement-Installer"
+   - Extract ZIP
+   - Get: StockManagement_Installer.exe
+
+Done! ✅
+
+========================================
+WHAT THE INSTALLER DOES
+========================================
+
+✅ Installs application to Program Files
+✅ Installs all GTK DLLs automatically
+✅ Installs GTK data files
+✅ Creates desktop shortcut
+✅ Creates Start Menu shortcut
+✅ Runs app after installation
+✅ Creates uninstaller
+
+Users don't need to:
+❌ Install GTK separately
+❌ Run any scripts
+❌ Copy DLLs manually
+❌ Do anything else!
+
+========================================
+FIRST TIME SETUP
+========================================
+
+1. Create GitHub repository:
+   https://github.com/new
+
+2. Initialize git (if not done):
+   git init
+   git add .
+   git commit -m "Initial commit"
+
+3. Add remote:
+   git remote add origin https://github.com/yourusername/repo.git
+
+4. Run build script:
+   ./build_installer_from_mac.sh
+
+========================================
+SUMMARY
+========================================
+
+Run on Mac:
+   ./build_installer_from_mac.sh
+
+Get from GitHub:
+   StockManagement_Installer.exe
+
+Users:
+   Double-click → Install → Run!
+
+========================================

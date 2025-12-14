@@ -1,0 +1,106 @@
+name: Build Windows Executable
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch: # Allows manual trigger
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install MSYS2
+        run: |
+          choco install msys2 -y
+          refreshenv
+
+      - name: Install GTK and Build Tools
+        shell: C:\tools\msys64\usr\bin\bash.exe -l {0}
+        run: |
+          pacman -Syu --noconfirm
+          pacman -S --noconfirm mingw-w64-x86_64-gtk3 mingw-w64-x86_64-pkg-config mingw-w64-x86_64-gcc make
+
+      - name: Build Application
+        shell: C:\tools\msys64\usr\bin\bash.exe -l {0}
+        run: |
+          cd ${{ github.workspace }}
+          if [ -f build_windows.sh ]; then
+            chmod +x build_windows.sh
+            ./build_windows.sh
+          else
+            # Fallback: manual build
+            mkdir -p bin obj data
+            gcc -Wall -Wextra -std=c11 -mwindows \
+              -o bin/stock_management.exe \
+              $(pkg-config --cflags --libs gtk+-3.0) \
+              src/*.c
+          fi
+
+      - name: Bundle DLLs
+        shell: C:\tools\msys64\usr\bin\bash.exe -l {0}
+        run: |
+          cd ${{ github.workspace }}
+          MSYS2_BIN=/mingw64/bin
+
+          # Copy essential DLLs
+          cp $MSYS2_BIN/libgtk-3-0.dll bin/ 2>/dev/null || true
+          cp $MSYS2_BIN/libgdk-3-0.dll bin/ 2>/dev/null || true
+          cp $MSYS2_BIN/libglib-2.0-0.dll bin/ 2>/dev/null || true
+          cp $MSYS2_BIN/libgobject-2.0-0.dll bin/ 2>/dev/null || true
+          cp $MSYS2_BIN/libgio-2.0-0.dll bin/ 2>/dev/null || true
+          cp $MSYS2_BIN/libpango-1.0-0.dll bin/ 2>/dev/null || true
+          cp $MSYS2_BIN/libcairo-2.dll bin/ 2>/dev/null || true
+
+          # Copy additional dependencies
+          cp $MSYS2_BIN/lib*.dll bin/ 2>/dev/null || true
+
+          # Copy GTK data files
+          if [ -d /mingw64/share/gtk-3.0 ]; then
+            mkdir -p bin/share
+            cp -r /mingw64/share/gtk-3.0 bin/share/ 2>/dev/null || true
+            cp -r /mingw64/share/glib-2.0 bin/share/ 2>/dev/null || true
+          fi
+
+          # Create data folder
+          mkdir -p bin/data
+
+      - name: Create Standalone Package
+        run: |
+          cd bin
+          if not exist share mkdir share
+          if not exist data mkdir data
+
+      - name: Upload Standalone Package
+        uses: actions/upload-artifact@v3
+        with:
+          name: StockManagement-Windows-Standalone
+          path: bin/*
+          retention-days: 30
+
+      - name: Install Inno Setup
+        run: |
+          choco install innosetup -y
+          refreshenv
+
+      - name: Create Installer
+        run: |
+          cd ${{ github.workspace }}
+          if [ -f StockManagement_Installer_WithGTK.iss ]; then
+            "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" StockManagement_Installer_WithGTK.iss
+          elif [ -f StockManagement_Installer.iss ]; then
+            "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" StockManagement_Installer.iss
+          fi
+
+      - name: Upload Installer
+        uses: actions/upload-artifact@v3
+        with:
+          name: StockManagement-Installer
+          path: installer/*.exe
+          retention-days: 30
+          if-no-files-found: warn

@@ -1,0 +1,54 @@
+# Makefile for Stock Management System - Windows Build
+# GTK+ 3.0 based application for Windows
+
+# Windows-specific compiler (MinGW)
+CC = gcc
+CFLAGS = -Wall -Wextra -std=c11 -mwindows
+GTK_CFLAGS = $(shell pkg-config --cflags gtk+-3.0)
+GTK_LIBS = $(shell pkg-config --libs gtk+-3.0)
+
+# Directories
+SRC_DIR = src
+OBJ_DIR = obj
+BIN_DIR = bin
+DATA_DIR = data
+
+# Source files
+SOURCES = $(wildcard $(SRC_DIR)/*.c)
+OBJECTS = $(SOURCES:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
+
+# Target executable (Windows .exe)
+TARGET = $(BIN_DIR)/stock_management.exe
+
+# Default target
+all: $(TARGET)
+
+# Create directories
+$(OBJ_DIR):
+	if not exist $(OBJ_DIR) mkdir $(OBJ_DIR)
+
+$(BIN_DIR):
+	if not exist $(BIN_DIR) mkdir $(BIN_DIR)
+
+$(DATA_DIR):
+	if not exist $(DATA_DIR) mkdir $(DATA_DIR)
+
+# Link object files to create executable
+$(TARGET): $(OBJECTS) | $(BIN_DIR) $(DATA_DIR)
+	$(CC) $(OBJECTS) -o $(TARGET) $(GTK_LIBS)
+
+# Compile source files to object files
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
+	$(CC) $(CFLAGS) $(GTK_CFLAGS) -c $< -o $@
+
+# Clean build artifacts
+clean:
+	if exist $(OBJ_DIR) rmdir /s /q $(OBJ_DIR)
+	if exist $(BIN_DIR) rmdir /s /q $(BIN_DIR)
+
+# Check if GTK is installed
+check-gtk:
+	@pkg-config --modversion gtk+-3.0 || (echo GTK+ 3.0 not found. Please install it first. && exit 1)
+
+.PHONY: all clean check-gtk
+

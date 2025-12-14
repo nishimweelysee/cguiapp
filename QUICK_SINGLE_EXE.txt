@@ -1,0 +1,67 @@
+========================================
+QUICK GUIDE: Create Single .exe File
+========================================
+
+GOAL: ONE single .exe file - no DLLs, no folders!
+
+========================================
+METHOD 1: Using 7-Zip SFX (Easiest)
+========================================
+
+Step 1: Build standalone package
+   ./build_standalone.bat
+
+Step 2: Create single .exe
+   ./create_sfx_7zip.bat
+
+Done! You now have: StockManagement.exe
+
+========================================
+METHOD 2: Using Enigma Virtual Box (Best)
+========================================
+
+1. Download: https://enigmaprotector.com/en/downloads.html
+2. Build: ./build_standalone.bat
+3. Open Enigma Virtual Box
+4. Add entire 'bin' folder
+5. Set executable: bin\stock_management.exe
+6. Click "Process"
+7. Done! Single .exe created
+
+========================================
+METHOD 3: Using IExpress (Windows Built-in)
+========================================
+
+1. Press Win+R, type: iexpress
+2. Follow wizard:
+   - Add all files from 'bin' folder
+   - Install program: stock_management.exe
+   - Package name: StockManagement.exe
+3. Done!
+
+========================================
+RESULT
+========================================
+
+ONE file: StockManagement.exe
+- Contains everything (DLLs, data files)
+- Runs on any Windows machine
+- No installation needed
+- Just double-click!
+
+========================================
+FILE SIZE
+========================================
+
+Expect: ~50-100 MB
+(Contains all GTK runtime files)
+
+========================================
+TESTING
+========================================
+
+1. Copy StockManagement.exe to clean Windows machine
+2. Double-click
+3. Should run immediately!
+
+========================================
