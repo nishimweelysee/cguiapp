@@ -42,9 +42,12 @@ jobs:
             PATH_PART=$(echo "$WIN_PATH" | cut -d: -f2)
             # Convert backslashes to forward slashes: \a\b -> /a/b
             PATH_PART=$(echo "$PATH_PART" | sed 's|\\|/|g')
-            # Remove leading backslash if present, ensure starts with /
-            PATH_PART=$(echo "$PATH_PART" | sed 's|^/||')
-            PATH_PART="/$PATH_PART"
+            # Ensure it starts with / (if it starts with backslash, convert; otherwise add /)
+            if [ "${PATH_PART:0:1}" = "\\" ]; then
+              PATH_PART=$(echo "$PATH_PART" | sed 's|^\\|/|')
+            elif [ "${PATH_PART:0:1}" != "/" ]; then
+              PATH_PART="/$PATH_PART"
+            fi
             MSYS_PATH="/$DRIVE$PATH_PART"
             echo "Manual conversion: $WIN_PATH -> $MSYS_PATH"
           fi
