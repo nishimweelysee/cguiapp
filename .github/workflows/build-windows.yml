@@ -45,11 +45,16 @@ jobs:
           ls -la src/ || echo "src directory not found!"
           mkdir -p bin obj data
           export PATH="/mingw64/bin:$PATH"
+          export PKG_CONFIG_PATH="/mingw64/lib/pkgconfig"
           echo "Building application..."
+          echo "pkg-config output:"
+          pkg-config --cflags --libs gtk+-3.0
           gcc -Wall -Wextra -std=c11 -mwindows \
             -o bin/stock_management.exe \
             $(pkg-config --cflags --libs gtk+-3.0) \
-            src/*.c
+            src/*.c \
+            -L/mingw64/lib \
+            -lgtk-3 -lgdk-3 -lgobject-2.0 -lglib-2.0 -lgio-2.0 -lpango-1.0 -lcairo -lgdk_pixbuf-2.0 -latk-1.0 -lpangocairo-1.0 -lpangoft2-1.0 -lepoxy
 
       - name: Bundle DLLs
         shell: C:\tools\msys64\usr\bin\bash.exe -l {0}
