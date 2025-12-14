@@ -29,11 +29,16 @@ jobs:
       - name: Build Application
         shell: C:\tools\msys64\usr\bin\bash.exe -l {0}
         run: |
-          cd /$(echo "${{ github.workspace }}" | sed 's/^\([A-Z]\):/\/\L\1/' | sed 's/\\/\//g')
-          pwd
+          # Convert Windows path to MSYS2 path: D:\a\cguiapp\cguiapp -> /d/a/cguiapp/cguiapp
+          WIN_PATH="${{ github.workspace }}"
+          MSYS_PATH="/$(echo "$WIN_PATH" | sed 's/^\([A-Za-z]\):/\/\L\1/' | sed 's/\\/\//g' | sed 's/://')"
+          cd "$MSYS_PATH"
+          echo "Current directory: $(pwd)"
+          echo "Files in directory:"
           ls -la
           mkdir -p bin obj data
           export PATH="/mingw64/bin:$PATH"
+          echo "Building application..."
           gcc -Wall -Wextra -std=c11 -mwindows \
             -o bin/stock_management.exe \
             $(pkg-config --cflags --libs gtk+-3.0) \
@@ -42,7 +47,10 @@ jobs:
       - name: Bundle DLLs
         shell: C:\tools\msys64\usr\bin\bash.exe -l {0}
         run: |
-          cd /$(echo "${{ github.workspace }}" | sed 's/^\([A-Z]\):/\/\L\1/' | sed 's/\\/\//g')
+          # Convert Windows path to MSYS2 path
+          WIN_PATH="${{ github.workspace }}"
+          MSYS_PATH="/$(echo "$WIN_PATH" | sed 's/^\([A-Za-z]\):/\/\L\1/' | sed 's/\\/\//g' | sed 's/://')"
+          cd "$MSYS_PATH"
           MSYS2_BIN=/mingw64/bin
 
           # Copy essential DLLs
