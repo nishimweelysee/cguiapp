@@ -77,8 +77,10 @@ jobs:
           # Convert Windows path to MSYS2 path
           WIN_PATH="${{ github.workspace }}"
           DRIVE=$(echo "$WIN_PATH" | cut -d: -f1 | tr '[:upper:]' '[:lower:]')
-          PATH_PART=$(echo "$WIN_PATH" | cut -d: -f2 | sed 's/\\/\//g')
-          PATH_PART=$(echo "$PATH_PART" | sed 's|^/||')
+          PATH_PART=$(echo "$WIN_PATH" | cut -d: -f2 | sed 's|\\|/|g')
+          if [ "${PATH_PART:0:1}" != "/" ]; then
+            PATH_PART="/$PATH_PART"
+          fi
           MSYS_PATH="/$DRIVE$PATH_PART"
           cd "$MSYS_PATH"
           MSYS2_BIN=/mingw64/bin
