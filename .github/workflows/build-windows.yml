@@ -20,11 +20,11 @@ jobs:
           choco install msys2 -y
           refreshenv
 
-      - name: Install GTK and Build Tools
+      - name: Install GTK and Build Tools (32-bit)
         shell: C:\tools\msys64\usr\bin\bash.exe -l {0}
         run: |
           pacman -Syu --noconfirm
-          pacman -S --noconfirm mingw-w64-x86_64-gtk3 mingw-w64-x86_64-pkg-config mingw-w64-x86_64-gcc make
+          pacman -S --noconfirm mingw-w64-i686-gtk3 mingw-w64-i686-pkg-config mingw-w64-i686-gcc make
 
       - name: Build Application
         shell: C:\tools\msys64\usr\bin\bash.exe -l {0}
@@ -70,8 +70,8 @@ jobs:
           echo "Checking for src directory:"
           ls -la src/ || echo "src directory not found!"
           mkdir -p bin obj data
-          export PATH="/mingw64/bin:$PATH"
-          export PKG_CONFIG_PATH="/mingw64/lib/pkgconfig"
+          export PATH="/mingw32/bin:$PATH"
+          export PKG_CONFIG_PATH="/mingw32/lib/pkgconfig"
           
           echo "=== Build Configuration ==="
           echo "Compiler info:"
@@ -79,13 +79,13 @@ jobs:
           GCC_TARGET=$(gcc -dumpmachine 2>/dev/null || echo "unknown")
           echo "Target architecture: $GCC_TARGET"
           
-          # Verify we're using 64-bit compiler
-          if [[ ! "$GCC_TARGET" == *"x86_64"* ]] && [[ ! "$GCC_TARGET" == *"64"* ]]; then
-            echo "WARNING: Compiler target doesn't appear to be 64-bit: $GCC_TARGET"
-            echo "Attempting to use explicit 64-bit compiler..."
-            if [ -f /mingw64/bin/x86_64-w64-mingw32-gcc.exe ]; then
-              export CC="/mingw64/bin/x86_64-w64-mingw32-gcc.exe"
-              echo "Using explicit 64-bit compiler: $CC"
+          # Verify we're using 32-bit compiler
+          if [[ ! "$GCC_TARGET" == *"i686"* ]] && [[ ! "$GCC_TARGET" == *"i386"* ]]; then
+            echo "WARNING: Compiler target doesn't appear to be 32-bit: $GCC_TARGET"
+            echo "Attempting to use explicit 32-bit compiler..."
+            if [ -f /mingw32/bin/i686-w64-mingw32-gcc.exe ]; then
+              export CC="/mingw32/bin/i686-w64-mingw32-gcc.exe"
+              echo "Using explicit 32-bit compiler: $CC"
             fi
           fi
           
@@ -93,18 +93,18 @@ jobs:
           pkg-config --cflags --libs gtk+-3.0 || echo "ERROR: pkg-config failed!"
           
           echo "=== Building Application ==="
-          echo "Building 64-bit Windows executable..."
+          echo "Building 32-bit Windows executable..."
           
-          # Build with explicit 64-bit flags
+          # Build with explicit 32-bit flags
           # Note: -mwindows sets subsystem to Windows (GUI), GTK handles entry point conversion
-          # Using -m64 explicitly ensures 64-bit build
+          # Using -m32 explicitly ensures 32-bit build
           gcc -Wall -Wextra -std=c11 \
             -mwindows \
-            -m64 \
+            -m32 \
             -o bin/stock_management.exe \
             $(pkg-config --cflags --libs gtk+-3.0) \
             src/*.c \
-            -L/mingw64/lib \
+            -L/mingw32/lib \
             -lgtk-3 -lgdk-3 -lgobject-2.0 -lglib-2.0 -lgio-2.0 -lpango-1.0 -lcairo -lgdk_pixbuf-2.0 -latk-1.0 -lpangocairo-1.0 -lpangoft2-1.0 -lepoxy
           
           BUILD_EXIT_CODE=$?
@@ -143,11 +143,11 @@ jobs:
             echo "  Expected: 4d5a or 5a4d (MZ)"
           fi
           
-          # Verify it's 64-bit by checking PE header
+          # Verify it's 32-bit by checking PE header
           echo "Checking architecture..."
           ARCH_INFO=$(objdump -f bin/stock_management.exe 2>/dev/null | grep -i "architecture" || echo "")
-          if [[ "$ARCH_INFO" == *"x86-64"* ]] || [[ "$ARCH_INFO" == *"i386:x86-64"* ]]; then
-            echo "✓ Confirmed: 64-bit executable"
+          if [[ "$ARCH_INFO" == *"i386"* ]] || [[ "$ARCH_INFO" == *"i686"* ]]; then
+            echo "✓ Confirmed: 32-bit executable"
           else
             echo "⚠ Architecture info: $ARCH_INFO"
           fi
@@ -164,7 +164,7 @@ jobs:
           fi
           MSYS_PATH="/$DRIVE$PATH_PART"
           cd "$MSYS_PATH"
-          MSYS2_BIN=/mingw64/bin
+          MSYS2_BIN=/mingw32/bin
 
           echo "Verifying executable architecture..."
           file bin/stock_management.exe || objdump -f bin/stock_management.exe | head -5 || echo "Could not verify architecture"
@@ -243,21 +243,21 @@ jobs:
 
           # Copy GTK data files
           echo "Copying GTK data files..."
-          if [ -d /mingw64/share/gtk-3.0 ]; then
+          if [ -d /mingw32/share/gtk-3.0 ]; then
             mkdir -p bin/share
-            cp -r /mingw64/share/gtk-3.0 bin/share/ 2>/dev/null || true
-            cp -r /mingw64/share/glib-2.0 bin/share/ 2>/dev/null || true
-            cp -r /mingw64/share/icons bin/share/ 2>/dev/null || true
-            cp -r /mingw64/share/themes bin/share/ 2>/dev/null || true
+            cp -r /mingw32/share/gtk-3.0 bin/share/ 2>/dev/null || true
+            cp -r /mingw32/share/glib-2.0 bin/share/ 2>/dev/null || true
+            cp -r /mingw32/share/icons bin/share/ 2>/dev/null || true
+            cp -r /mingw32/share/themes bin/share/ 2>/dev/null || true
           fi
 
           # Create data folder
           mkdir -p bin/data
 
           # Compile schemas if glib-compile-schemas exists
-          if [ -f /mingw64/bin/glib-compile-schemas.exe ] && [ -d bin/share/glib-2.0/schemas ]; then
+          if [ -f /mingw32/bin/glib-compile-schemas.exe ] && [ -d bin/share/glib-2.0/schemas ]; then
             echo "Compiling GLib schemas..."
-            /mingw64/bin/glib-compile-schemas.exe bin/share/glib-2.0/schemas 2>/dev/null || true
+            /mingw32/bin/glib-compile-schemas.exe bin/share/glib-2.0/schemas 2>/dev/null || true
           fi
 
           echo "Verifying DLLs in bin directory..."
@@ -345,7 +345,7 @@ jobs:
       - name: Upload Standalone Package
         uses: actions/upload-artifact@v4
         with:
-          name: StockManagement-Windows-Standalone
+          name: StockManagement-Windows-Standalone-32bit
           path: bin/*
           retention-days: 30
 
@@ -394,7 +394,7 @@ jobs:
       - name: Upload Installer
         uses: actions/upload-artifact@v4
         with:
-          name: StockManagement-Installer
+          name: StockManagement-Installer-32bit
           path: installer/*.exe
           retention-days: 30
           if-no-files-found: warn

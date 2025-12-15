@@ -19,7 +19,8 @@ Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
 PrivilegesRequired=admin
-ArchitecturesInstallIn64BitMode=x64
+; 32-bit build - works on both 32-bit and 64-bit Windows
+ArchitecturesAllowed=x86 x64compatible
 
 ; Installer appearance
 WizardImageFile=
