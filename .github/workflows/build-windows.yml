@@ -179,7 +179,8 @@ jobs:
             # Note: Includes both libtiff-5.dll and libtiff-6.dll for compatibility
             # Includes all image format libraries and compression libraries
             # Note: Includes both case variants for libLerc (libLerc.dll and liblerc.dll)
-            DEPENDENCIES="libgcc_s_dw2-1.dll libwinpthread-1.dll libgtk-3-0.dll libgdk-3-0.dll libglib-2.0-0.dll libgobject-2.0-0.dll libgio-2.0-0.dll libpango-1.0-0.dll libcairo-2.dll libcairo-gobject-2.dll libpangoft2-1.0-0.dll libpangocairo-1.0-0.dll libgdk_pixbuf-2.0-0.dll libatk-1.0-0.dll libepoxy-0.dll libintl-8.dll libiconv-2.dll libffi-8.dll libbz2-1.dll libharfbuzz-0.dll libfreetype-6.dll libfontconfig-1.dll libpng16-16.dll libjpeg-8.dll libtiff-5.dll libtiff-6.dll libpixman-1-0.dll libexpat-1.dll libzstd.dll liblzma-5.dll liblzma.dll libz-1.dll zlib1.dll libpcre2-8-0.dll libpcre2-16-0.dll libpcre2-32-0.dll libdeflate.dll libjbig-0.dll libLerc.dll liblerc.dll libwebp-7.dll libwebp-8.dll"
+            # Includes SharpYUV (used by WebP) and all image format libraries
+            DEPENDENCIES="libgcc_s_dw2-1.dll libwinpthread-1.dll libgtk-3-0.dll libgdk-3-0.dll libglib-2.0-0.dll libgobject-2.0-0.dll libgio-2.0-0.dll libpango-1.0-0.dll libcairo-2.dll libcairo-gobject-2.dll libpangoft2-1.0-0.dll libpangocairo-1.0-0.dll libgdk_pixbuf-2.0-0.dll libatk-1.0-0.dll libepoxy-0.dll libintl-8.dll libiconv-2.dll libffi-8.dll libbz2-1.dll libharfbuzz-0.dll libfreetype-6.dll libfontconfig-1.dll libpng16-16.dll libjpeg-8.dll libtiff-5.dll libtiff-6.dll libpixman-1-0.dll libexpat-1.dll libzstd.dll liblzma-5.dll liblzma.dll libz-1.dll zlib1.dll libpcre2-8-0.dll libpcre2-16-0.dll libpcre2-32-0.dll libdeflate.dll libjbig-0.dll libLerc.dll liblerc.dll libwebp-7.dll libwebp-8.dll libsharpyuv-0.dll"
           fi
 
           echo "Direct dependencies found:"
@@ -323,24 +324,24 @@ jobs:
             fi
           done
 
-          # Copy WebP DLLs
+          # Copy WebP DLLs (including SharpYUV dependency)
           echo "Copying WebP DLLs..."
-          WEBP_DLLS="libwebp-7.dll libwebp.dll libwebp-8.dll"
+          WEBP_DLLS="libwebp-7.dll libwebp.dll libwebp-8.dll libsharpyuv-0.dll libsharpyuv.dll"
           for dll in $WEBP_DLLS; do
             if [ -f "$MSYS2_BIN/$dll" ]; then
-              cp "$MSYS2_BIN/$dll" bin/ && echo "✓ Copied WebP DLL: $dll" || echo "✗ Failed to copy: $dll"
+              cp "$MSYS2_BIN/$dll" bin/ && echo "✓ Copied WebP/SharpYUV DLL: $dll" || echo "✗ Failed to copy: $dll"
             else
               # Try case-insensitive search
               FOUND_DLL=$(find "$MSYS2_BIN" -maxdepth 1 -iname "$dll" 2>/dev/null | head -1)
               if [ -n "$FOUND_DLL" ] && [ -f "$FOUND_DLL" ]; then
-                cp "$FOUND_DLL" bin/ && echo "✓ Copied WebP DLL (case variant): $(basename "$FOUND_DLL")" || echo "✗ Failed to copy: $FOUND_DLL"
+                cp "$FOUND_DLL" bin/ && echo "✓ Copied WebP/SharpYUV DLL (case variant): $(basename "$FOUND_DLL")" || echo "✗ Failed to copy: $FOUND_DLL"
               fi
             fi
           done
 
           # Additional check: Find any DLLs matching these patterns (case-insensitive)
           echo "Searching for additional image/compression DLLs..."
-          for pattern in "libdeflate*.dll" "liblerc*.dll" "libwebp*.dll"; do
+          for pattern in "libdeflate*.dll" "liblerc*.dll" "libwebp*.dll" "libsharpyuv*.dll"; do
             FOUND_DLLS=$(find "$MSYS2_BIN" -maxdepth 1 -iname "$pattern" 2>/dev/null)
             for found_dll in $FOUND_DLLS; do
               DLL_NAME=$(basename "$found_dll")
@@ -486,6 +487,18 @@ jobs:
             fi
           fi
 
+          # Verify libsharpyuv-0.dll (SharpYUV - used by WebP)
+          if [ -f "bin/libsharpyuv-0.dll" ] || [ -f "bin/libsharpyuv.dll" ]; then
+            echo "✓ libsharpyuv DLL found"
+          else
+            echo "✗ ERROR: libsharpyuv DLL missing!"
+            # Try to find and copy
+            FOUND_SHARPYUV=$(find "$MSYS2_BIN" -maxdepth 1 -iname "libsharpyuv*.dll" 2>/dev/null | head -1)
+            if [ -n "$FOUND_SHARPYUV" ] && [ -f "$FOUND_SHARPYUV" ]; then
+              cp "$FOUND_SHARPYUV" bin/ && echo "✓ Copied libsharpyuv variant: $(basename "$FOUND_SHARPYUV")"
+            fi
+          fi
+
           # Copy any remaining DLLs matching common GTK/Cairo patterns (safety net)
           echo ""
           echo "Copying any remaining GTK/Cairo/GLib DLLs (safety net)..."
@@ -623,7 +636,7 @@ jobs:
           fi
 
           echo "Checking for critical DLLs..."
-          CRITICAL_DLLS="libgcc_s_dw2-1.dll libwinpthread-1.dll libgtk-3-0.dll libglib-2.0-0.dll libgobject-2.0-0.dll libcairo-2.dll libcairo-gobject-2.dll zlib1.dll libpcre2-8-0.dll libtiff-6.dll libjpeg-8.dll libpixman-1-0.dll liblzma.dll libdeflate.dll libjbig-0.dll libLerc.dll libwebp-7.dll"
+          CRITICAL_DLLS="libgcc_s_dw2-1.dll libwinpthread-1.dll libgtk-3-0.dll libglib-2.0-0.dll libgobject-2.0-0.dll libcairo-2.dll libcairo-gobject-2.dll zlib1.dll libpcre2-8-0.dll libtiff-6.dll libjpeg-8.dll libpixman-1-0.dll liblzma.dll libdeflate.dll libjbig-0.dll libLerc.dll libwebp-7.dll libsharpyuv-0.dll"
           MISSING_CRITICAL=0
           for dll in $CRITICAL_DLLS; do
             if [ -f "bin/$dll" ]; then
@@ -753,7 +766,7 @@ jobs:
           # Verify no obvious missing DLLs by checking common patterns
           echo ""
           echo "=== Pattern-based Verification ==="
-          PATTERNS_TO_CHECK="libgcc libwinpthread libgtk libgdk libglib libgobject libgio libgmodule libgthread libcairo libpango libatk libepoxy libgdk_pixbuf libintl libiconv libffi libharfbuzz libfreetype libfontconfig libpng libjpeg libtiff libpixman libexpat libz libbz2 liblzma libzstd libpcre2 libdeflate libjbig libLerc libwebp zlib"
+          PATTERNS_TO_CHECK="libgcc libwinpthread libgtk libgdk libglib libgobject libgio libgmodule libgthread libcairo libpango libatk libepoxy libgdk_pixbuf libintl libiconv libffi libharfbuzz libfreetype libfontconfig libpng libjpeg libtiff libpixman libexpat libz libbz2 liblzma libzstd libpcre2 libdeflate libjbig libLerc libwebp libsharpyuv zlib"
           for pattern in $PATTERNS_TO_CHECK; do
             DLLS_WITH_PATTERN=$(ls -1 bin/${pattern}*.dll 2>/dev/null | wc -l)
             if [ "$DLLS_WITH_PATTERN" -eq 0 ]; then
@@ -883,6 +896,11 @@ jobs:
             echo [OK] libwebp-7.dll found
           ) else (
             echo [ERROR] libwebp-7.dll MISSING - Application will not run!
+          )
+          if exist bin\libsharpyuv-0.dll (
+            echo [OK] libsharpyuv-0.dll found
+          ) else (
+            echo [ERROR] libsharpyuv-0.dll MISSING - Application will not run!
           )
 
       - name: Create Installer
