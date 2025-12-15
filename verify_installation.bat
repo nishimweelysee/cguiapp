@@ -62,10 +62,12 @@ if %DLL_COUNT% LSS 20 (
 )
 echo.
 
-REM Check critical DLLs
+REM Check critical DLLs (including MinGW runtime)
 echo Checking critical DLLs...
 set MISSING=0
 for %%d in (
+    libgcc_s_dw2-1.dll
+    libwinpthread-1.dll
     libgtk-3-0.dll
     libglib-2.0-0.dll
     libgobject-2.0-0.dll

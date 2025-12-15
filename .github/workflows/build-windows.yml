@@ -175,8 +175,8 @@ jobs:
           
           if [ -z "$DEPENDENCIES" ]; then
             echo "Warning: Could not extract dependencies automatically, using comprehensive manual list"
-            # Comprehensive manual list as fallback
-            DEPENDENCIES="libgtk-3-0.dll libgdk-3-0.dll libglib-2.0-0.dll libgobject-2.0-0.dll libgio-2.0-0.dll libpango-1.0-0.dll libcairo-2.dll libpangoft2-1.0-0.dll libpangocairo-1.0-0.dll libgdk_pixbuf-2.0-0.dll libatk-1.0-0.dll libepoxy-0.dll libintl-8.dll libiconv-2.dll libwinpthread-1.dll libffi-8.dll libbz2-1.dll libharfbuzz-0.dll libfreetype-6.dll libfontconfig-1.dll libpng16-16.dll libjpeg-8.dll libtiff-5.dll libpixman-1-0.dll libexpat-1.dll libzstd.dll liblzma-5.dll libz-1.dll"
+            # Comprehensive manual list as fallback (includes MinGW runtime DLLs)
+            DEPENDENCIES="libgcc_s_dw2-1.dll libwinpthread-1.dll libgtk-3-0.dll libgdk-3-0.dll libglib-2.0-0.dll libgobject-2.0-0.dll libgio-2.0-0.dll libpango-1.0-0.dll libcairo-2.dll libpangoft2-1.0-0.dll libpangocairo-1.0-0.dll libgdk_pixbuf-2.0-0.dll libatk-1.0-0.dll libepoxy-0.dll libintl-8.dll libiconv-2.dll libffi-8.dll libbz2-1.dll libharfbuzz-0.dll libfreetype-6.dll libfontconfig-1.dll libpng16-16.dll libjpeg-8.dll libtiff-5.dll libpixman-1-0.dll libexpat-1.dll libzstd.dll liblzma-5.dll libz-1.dll"
           fi
 
           echo "Direct dependencies found:"
@@ -232,6 +232,17 @@ jobs:
           echo ""
           echo "DLL copy summary: $COPY_COUNT copied, $MISSING_COUNT not found (may be system DLLs)"
 
+          # Copy MinGW runtime DLLs (CRITICAL for application to run)
+          echo "Copying MinGW runtime DLLs..."
+          MINGW_RUNTIME_DLLS="libgcc_s_dw2-1.dll libgcc_s_seh-1.dll libstdc++-6.dll libwinpthread-1.dll"
+          for dll in $MINGW_RUNTIME_DLLS; do
+            if [ -f "$MSYS2_BIN/$dll" ]; then
+              cp "$MSYS2_BIN/$dll" bin/ && echo "✓ Copied MinGW runtime: $dll" || echo "✗ Failed to copy: $dll"
+            else
+              echo "⚠ MinGW runtime DLL not found: $dll (may not be needed for this build)"
+            fi
+          done
+
           # Copy additional common DLLs that might be needed
           echo "Copying additional common DLLs..."
           ADDITIONAL_DLLS="libbrotlidec.dll libbrotlicommon.dll libgraphite2.dll libdatrie-1.dll libthai-0.dll libfribidi-0.dll"
@@ -240,6 +251,19 @@ jobs:
               cp "$MSYS2_BIN/$dll" bin/ 2>/dev/null && echo "✓ Copied additional: $dll" || true
             fi
           done
+          
+          # Verify critical MinGW runtime DLL is present
+          echo ""
+          echo "Verifying MinGW runtime DLLs..."
+          if [ -f "bin/libgcc_s_dw2-1.dll" ]; then
+            echo "✓ libgcc_s_dw2-1.dll found (required for 32-bit builds)"
+          elif [ -f "bin/libgcc_s_seh-1.dll" ]; then
+            echo "✓ libgcc_s_seh-1.dll found (required for 64-bit builds)"
+          else
+            echo "✗ WARNING: No MinGW runtime DLL found! Application may not run."
+            echo "  Attempting to find any libgcc DLL..."
+            ls -la "$MSYS2_BIN"/libgcc*.dll 2>/dev/null || echo "  No libgcc DLLs found in $MSYS2_BIN"
+          fi
 
           # Copy GTK data files
           echo "Copying GTK data files..."
@@ -292,14 +316,22 @@ jobs:
           fi
 
           echo "Checking for critical DLLs..."
-          CRITICAL_DLLS="libgtk-3-0.dll libglib-2.0-0.dll libgobject-2.0-0.dll"
+          CRITICAL_DLLS="libgcc_s_dw2-1.dll libwinpthread-1.dll libgtk-3-0.dll libglib-2.0-0.dll libgobject-2.0-0.dll"
+          MISSING_CRITICAL=0
           for dll in $CRITICAL_DLLS; do
             if [ -f "bin/$dll" ]; then
               echo "✓ Found: $dll"
             else
               echo "✗ Missing: $dll"
+              MISSING_CRITICAL=$((MISSING_CRITICAL + 1))
             fi
           done
+          
+          if [ $MISSING_CRITICAL -gt 0 ]; then
+            echo ""
+            echo "⚠ WARNING: $MISSING_CRITICAL critical DLL(s) missing!"
+            echo "  The application may not run without these DLLs."
+          fi
 
           echo "Verifying executable format..."
           file bin/stock_management.exe || echo "file command not available"
@@ -370,6 +402,18 @@ jobs:
           echo.
           echo Verifying PE format...
           powershell -Command "Get-Content bin\stock_management.exe -TotalCount 2 -Encoding Byte | ForEach-Object { '{0:X2}' -f $_ }"
+          echo.
+          echo Checking for MinGW runtime DLLs...
+          if exist bin\libgcc_s_dw2-1.dll (
+            echo [OK] libgcc_s_dw2-1.dll found
+          ) else (
+            echo [ERROR] libgcc_s_dw2-1.dll MISSING - Application will not run!
+          )
+          if exist bin\libwinpthread-1.dll (
+            echo [OK] libwinpthread-1.dll found
+          ) else (
+            echo [WARN] libwinpthread-1.dll missing
+          )
           
       - name: Create Installer
         shell: cmd
