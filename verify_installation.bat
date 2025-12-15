@@ -84,6 +84,7 @@ for %%d in (
     libjbig-0.dll
     libLerc.dll
     libwebp-7.dll
+    libsharpyuv-0.dll
 ) do (
     if exist "%APP_DIR%\%%d" (
         echo [OK] Found: %%d

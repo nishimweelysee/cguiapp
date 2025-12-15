@@ -178,7 +178,8 @@ jobs:
             # Comprehensive manual list as fallback (includes MinGW runtime DLLs and all Cairo DLLs)
             # Note: Includes both libtiff-5.dll and libtiff-6.dll for compatibility
             # Includes all image format libraries and compression libraries
-            DEPENDENCIES="libgcc_s_dw2-1.dll libwinpthread-1.dll libgtk-3-0.dll libgdk-3-0.dll libglib-2.0-0.dll libgobject-2.0-0.dll libgio-2.0-0.dll libpango-1.0-0.dll libcairo-2.dll libcairo-gobject-2.dll libpangoft2-1.0-0.dll libpangocairo-1.0-0.dll libgdk_pixbuf-2.0-0.dll libatk-1.0-0.dll libepoxy-0.dll libintl-8.dll libiconv-2.dll libffi-8.dll libbz2-1.dll libharfbuzz-0.dll libfreetype-6.dll libfontconfig-1.dll libpng16-16.dll libjpeg-8.dll libtiff-5.dll libtiff-6.dll libpixman-1-0.dll libexpat-1.dll libzstd.dll liblzma-5.dll liblzma.dll libz-1.dll zlib1.dll libpcre2-8-0.dll libpcre2-16-0.dll libpcre2-32-0.dll libdeflate.dll libjbig-0.dll libLerc.dll libwebp-7.dll"
+            # Note: Includes both case variants for libLerc (libLerc.dll and liblerc.dll)
+            DEPENDENCIES="libgcc_s_dw2-1.dll libwinpthread-1.dll libgtk-3-0.dll libgdk-3-0.dll libglib-2.0-0.dll libgobject-2.0-0.dll libgio-2.0-0.dll libpango-1.0-0.dll libcairo-2.dll libcairo-gobject-2.dll libpangoft2-1.0-0.dll libpangocairo-1.0-0.dll libgdk_pixbuf-2.0-0.dll libatk-1.0-0.dll libepoxy-0.dll libintl-8.dll libiconv-2.dll libffi-8.dll libbz2-1.dll libharfbuzz-0.dll libfreetype-6.dll libfontconfig-1.dll libpng16-16.dll libjpeg-8.dll libtiff-5.dll libtiff-6.dll libpixman-1-0.dll libexpat-1.dll libzstd.dll liblzma-5.dll liblzma.dll libz-1.dll zlib1.dll libpcre2-8-0.dll libpcre2-16-0.dll libpcre2-32-0.dll libdeflate.dll libjbig-0.dll libLerc.dll liblerc.dll libwebp-7.dll libwebp-8.dll"
           fi
 
           echo "Direct dependencies found:"
@@ -275,7 +276,13 @@ jobs:
             if [ -f "$MSYS2_BIN/$dll" ]; then
               cp "$MSYS2_BIN/$dll" bin/ && echo "✓ Copied compression DLL: $dll" || echo "✗ Failed to copy: $dll"
             else
-              echo "⚠ Compression DLL not found: $dll"
+              # Try case-insensitive search
+              FOUND_DLL=$(find "$MSYS2_BIN" -maxdepth 1 -iname "$dll" 2>/dev/null | head -1)
+              if [ -n "$FOUND_DLL" ] && [ -f "$FOUND_DLL" ]; then
+                cp "$FOUND_DLL" bin/ && echo "✓ Copied compression DLL (case variant): $(basename "$FOUND_DLL")" || echo "✗ Failed to copy: $FOUND_DLL"
+              else
+                echo "⚠ Compression DLL not found: $dll"
+              fi
             fi
           done
 
@@ -292,12 +299,18 @@ jobs:
 
           # Copy TIFF DLLs (both versions for compatibility)
           echo "Copying TIFF DLLs..."
-          TIFF_DLLS="libtiff-5.dll libtiff-6.dll libjbig-0.dll libLerc.dll"
+          TIFF_DLLS="libtiff-5.dll libtiff-6.dll libjbig-0.dll libLerc.dll liblerc.dll"
           for dll in $TIFF_DLLS; do
             if [ -f "$MSYS2_BIN/$dll" ]; then
               cp "$MSYS2_BIN/$dll" bin/ && echo "✓ Copied TIFF/Image DLL: $dll" || echo "✗ Failed to copy: $dll"
             else
-              echo "⚠ TIFF/Image DLL not found: $dll"
+              # Try case-insensitive search
+              FOUND_DLL=$(find "$MSYS2_BIN" -maxdepth 1 -iname "$dll" 2>/dev/null | head -1)
+              if [ -n "$FOUND_DLL" ] && [ -f "$FOUND_DLL" ]; then
+                cp "$FOUND_DLL" bin/ && echo "✓ Copied TIFF/Image DLL (case variant): $(basename "$FOUND_DLL")" || echo "✗ Failed to copy: $FOUND_DLL"
+              else
+                echo "⚠ TIFF/Image DLL not found: $dll"
+              fi
             fi
           done
 
@@ -312,11 +325,29 @@ jobs:
 
           # Copy WebP DLLs
           echo "Copying WebP DLLs..."
-          WEBP_DLLS="libwebp-7.dll libwebp.dll"
+          WEBP_DLLS="libwebp-7.dll libwebp.dll libwebp-8.dll"
           for dll in $WEBP_DLLS; do
             if [ -f "$MSYS2_BIN/$dll" ]; then
               cp "$MSYS2_BIN/$dll" bin/ && echo "✓ Copied WebP DLL: $dll" || echo "✗ Failed to copy: $dll"
+            else
+              # Try case-insensitive search
+              FOUND_DLL=$(find "$MSYS2_BIN" -maxdepth 1 -iname "$dll" 2>/dev/null | head -1)
+              if [ -n "$FOUND_DLL" ] && [ -f "$FOUND_DLL" ]; then
+                cp "$FOUND_DLL" bin/ && echo "✓ Copied WebP DLL (case variant): $(basename "$FOUND_DLL")" || echo "✗ Failed to copy: $FOUND_DLL"
+              fi
             fi
+          done
+
+          # Additional check: Find any DLLs matching these patterns (case-insensitive)
+          echo "Searching for additional image/compression DLLs..."
+          for pattern in "libdeflate*.dll" "liblerc*.dll" "libwebp*.dll"; do
+            FOUND_DLLS=$(find "$MSYS2_BIN" -maxdepth 1 -iname "$pattern" 2>/dev/null)
+            for found_dll in $FOUND_DLLS; do
+              DLL_NAME=$(basename "$found_dll")
+              if [ ! -f "bin/$DLL_NAME" ]; then
+                cp "$found_dll" bin/ && echo "✓ Copied additional DLL: $DLL_NAME" || true
+              fi
+            done
           done
 
           # Copy Pixman DLLs (CRITICAL for Cairo)
@@ -417,6 +448,42 @@ jobs:
             fi
           else
             echo "✗ ERROR: No TIFF DLL found!"
+          fi
+
+          # Verify libLerc.dll (check both cases)
+          if [ -f "bin/libLerc.dll" ] || [ -f "bin/liblerc.dll" ]; then
+            echo "✓ libLerc.dll found (or case variant)"
+          else
+            echo "✗ ERROR: libLerc.dll missing!"
+            # Try to find and copy
+            FOUND_LERC=$(find "$MSYS2_BIN" -maxdepth 1 -iname "liblerc*.dll" 2>/dev/null | head -1)
+            if [ -n "$FOUND_LERC" ] && [ -f "$FOUND_LERC" ]; then
+              cp "$FOUND_LERC" bin/ && echo "✓ Copied libLerc variant: $(basename "$FOUND_LERC")"
+            fi
+          fi
+
+          # Verify libdeflate.dll
+          if [ -f "bin/libdeflate.dll" ]; then
+            echo "✓ libdeflate.dll found"
+          else
+            echo "✗ ERROR: libdeflate.dll missing!"
+            # Try to find and copy
+            FOUND_DEFLATE=$(find "$MSYS2_BIN" -maxdepth 1 -iname "libdeflate*.dll" 2>/dev/null | head -1)
+            if [ -n "$FOUND_DEFLATE" ] && [ -f "$FOUND_DEFLATE" ]; then
+              cp "$FOUND_DEFLATE" bin/ && echo "✓ Copied libdeflate variant: $(basename "$FOUND_DEFLATE")"
+            fi
+          fi
+
+          # Verify libwebp-7.dll
+          if [ -f "bin/libwebp-7.dll" ] || [ -f "bin/libwebp-8.dll" ]; then
+            echo "✓ libwebp DLL found"
+          else
+            echo "✗ ERROR: libwebp DLL missing!"
+            # Try to find and copy
+            FOUND_WEBP=$(find "$MSYS2_BIN" -maxdepth 1 -iname "libwebp*.dll" 2>/dev/null | head -1)
+            if [ -n "$FOUND_WEBP" ] && [ -f "$FOUND_WEBP" ]; then
+              cp "$FOUND_WEBP" bin/ && echo "✓ Copied libwebp variant: $(basename "$FOUND_WEBP")"
+            fi
           fi
 
           # Copy any remaining DLLs matching common GTK/Cairo patterns (safety net)
