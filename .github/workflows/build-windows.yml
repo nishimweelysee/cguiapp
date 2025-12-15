@@ -25,6 +25,8 @@ jobs:
         run: |
           pacman -Syu --noconfirm
           pacman -S --noconfirm mingw-w64-i686-gtk3 mingw-w64-i686-pkg-config mingw-w64-i686-gcc make
+          # Install image format libraries (including SharpYUV for WebP)
+          pacman -S --noconfirm mingw-w64-i686-libwebp mingw-w64-i686-libsharpyuv || echo "Note: libsharpyuv may not be available as separate package"
 
       - name: Build Application
         shell: C:\tools\msys64\usr\bin\bash.exe -l {0}
@@ -335,9 +337,36 @@ jobs:
               FOUND_DLL=$(find "$MSYS2_BIN" -maxdepth 1 -iname "$dll" 2>/dev/null | head -1)
               if [ -n "$FOUND_DLL" ] && [ -f "$FOUND_DLL" ]; then
                 cp "$FOUND_DLL" bin/ && echo "✓ Copied WebP/SharpYUV DLL (case variant): $(basename "$FOUND_DLL")" || echo "✗ Failed to copy: $FOUND_DLL"
+              else
+                # Try searching in lib directory as well
+                if [ -f "/mingw32/lib/$dll" ]; then
+                  cp "/mingw32/lib/$dll" bin/ && echo "✓ Copied WebP/SharpYUV DLL from lib: $dll" || echo "✗ Failed to copy from lib: $dll"
+                fi
               fi
             fi
           done
+          
+          # Special handling for SharpYUV - search more thoroughly
+          echo "Searching for SharpYUV DLLs..."
+          if [ ! -f "bin/libsharpyuv-0.dll" ] && [ ! -f "bin/libsharpyuv.dll" ]; then
+            # Search in bin
+            SHARPYUV_FOUND=$(find "$MSYS2_BIN" -maxdepth 1 -iname "*sharpyuv*.dll" 2>/dev/null)
+            # Search in lib
+            SHARPYUV_FOUND="$SHARPYUV_FOUND $(find /mingw32/lib -maxdepth 1 -iname "*sharpyuv*.dll" 2>/dev/null)"
+            # Search in share (sometimes DLLs are there)
+            SHARPYUV_FOUND="$SHARPYUV_FOUND $(find /mingw32/share -maxdepth 3 -iname "*sharpyuv*.dll" 2>/dev/null)"
+            
+            for found_dll in $SHARPYUV_FOUND; do
+              if [ -f "$found_dll" ]; then
+                DLL_NAME=$(basename "$found_dll")
+                cp "$found_dll" bin/ && echo "✓ Found and copied SharpYUV DLL: $DLL_NAME (from $(dirname "$found_dll"))" || true
+              fi
+            done
+            
+            # List what SharpYUV files exist for debugging
+            echo "Available SharpYUV files in MSYS2:"
+            find /mingw32 -iname "*sharpyuv*" 2>/dev/null | head -10 || echo "  (none found)"
+          fi
 
           # Additional check: Find any DLLs matching these patterns (case-insensitive)
           echo "Searching for additional image/compression DLLs..."
@@ -492,10 +521,20 @@ jobs:
             echo "✓ libsharpyuv DLL found"
           else
             echo "✗ ERROR: libsharpyuv DLL missing!"
-            # Try to find and copy
-            FOUND_SHARPYUV=$(find "$MSYS2_BIN" -maxdepth 1 -iname "libsharpyuv*.dll" 2>/dev/null | head -1)
+            echo "  Searching for SharpYUV DLLs in all locations..."
+            # Try to find and copy from multiple locations
+            FOUND_SHARPYUV=$(find "$MSYS2_BIN" -maxdepth 1 -iname "*sharpyuv*.dll" 2>/dev/null | head -1)
+            if [ -z "$FOUND_SHARPYUV" ]; then
+              FOUND_SHARPYUV=$(find /mingw32/lib -maxdepth 1 -iname "*sharpyuv*.dll" 2>/dev/null | head -1)
+            fi
+            if [ -z "$FOUND_SHARPYUV" ]; then
+              FOUND_SHARPYUV=$(find /mingw32 -iname "*sharpyuv*.dll" 2>/dev/null | head -1)
+            fi
             if [ -n "$FOUND_SHARPYUV" ] && [ -f "$FOUND_SHARPYUV" ]; then
-              cp "$FOUND_SHARPYUV" bin/ && echo "✓ Copied libsharpyuv variant: $(basename "$FOUND_SHARPYUV")"
+              cp "$FOUND_SHARPYUV" bin/ && echo "✓ Copied libsharpyuv variant: $(basename "$FOUND_SHARPYUV") from $(dirname "$FOUND_SHARPYUV")"
+            else
+              echo "  ⚠ Could not find libsharpyuv DLL anywhere in MSYS2"
+              echo "  This DLL may need to be installed: pacman -S mingw-w64-i686-libsharpyuv"
             fi
           fi
 
