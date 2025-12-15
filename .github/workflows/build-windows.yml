@@ -177,7 +177,8 @@ jobs:
             echo "Warning: Could not extract dependencies automatically, using comprehensive manual list"
             # Comprehensive manual list as fallback (includes MinGW runtime DLLs and all Cairo DLLs)
             # Note: Includes both libtiff-5.dll and libtiff-6.dll for compatibility
-            DEPENDENCIES="libgcc_s_dw2-1.dll libwinpthread-1.dll libgtk-3-0.dll libgdk-3-0.dll libglib-2.0-0.dll libgobject-2.0-0.dll libgio-2.0-0.dll libpango-1.0-0.dll libcairo-2.dll libcairo-gobject-2.dll libpangoft2-1.0-0.dll libpangocairo-1.0-0.dll libgdk_pixbuf-2.0-0.dll libatk-1.0-0.dll libepoxy-0.dll libintl-8.dll libiconv-2.dll libffi-8.dll libbz2-1.dll libharfbuzz-0.dll libfreetype-6.dll libfontconfig-1.dll libpng16-16.dll libjpeg-8.dll libtiff-5.dll libtiff-6.dll libpixman-1-0.dll libexpat-1.dll libzstd.dll liblzma-5.dll libz-1.dll zlib1.dll libpcre2-8-0.dll libpcre2-16-0.dll libpcre2-32-0.dll"
+            # Includes all image format libraries and compression libraries
+            DEPENDENCIES="libgcc_s_dw2-1.dll libwinpthread-1.dll libgtk-3-0.dll libgdk-3-0.dll libglib-2.0-0.dll libgobject-2.0-0.dll libgio-2.0-0.dll libpango-1.0-0.dll libcairo-2.dll libcairo-gobject-2.dll libpangoft2-1.0-0.dll libpangocairo-1.0-0.dll libgdk_pixbuf-2.0-0.dll libatk-1.0-0.dll libepoxy-0.dll libintl-8.dll libiconv-2.dll libffi-8.dll libbz2-1.dll libharfbuzz-0.dll libfreetype-6.dll libfontconfig-1.dll libpng16-16.dll libjpeg-8.dll libtiff-5.dll libtiff-6.dll libpixman-1-0.dll libexpat-1.dll libzstd.dll liblzma-5.dll liblzma.dll libz-1.dll zlib1.dll libpcre2-8-0.dll libpcre2-16-0.dll libpcre2-32-0.dll libdeflate.dll libjbig-0.dll libLerc.dll libwebp-7.dll"
           fi
 
           echo "Direct dependencies found:"
@@ -269,7 +270,7 @@ jobs:
 
           # Copy compression and utility DLLs (CRITICAL - commonly missing)
           echo "Copying compression and utility DLLs..."
-          COMPRESSION_DLLS="zlib1.dll libz-1.dll libbz2-1.dll liblzma-5.dll libzstd.dll"
+          COMPRESSION_DLLS="zlib1.dll libz-1.dll libbz2-1.dll liblzma-5.dll liblzma.dll libzstd.dll libdeflate.dll"
           for dll in $COMPRESSION_DLLS; do
             if [ -f "$MSYS2_BIN/$dll" ]; then
               cp "$MSYS2_BIN/$dll" bin/ && echo "✓ Copied compression DLL: $dll" || echo "✗ Failed to copy: $dll"
@@ -291,12 +292,39 @@ jobs:
 
           # Copy TIFF DLLs (both versions for compatibility)
           echo "Copying TIFF DLLs..."
-          TIFF_DLLS="libtiff-5.dll libtiff-6.dll"
+          TIFF_DLLS="libtiff-5.dll libtiff-6.dll libjbig-0.dll libLerc.dll"
           for dll in $TIFF_DLLS; do
             if [ -f "$MSYS2_BIN/$dll" ]; then
-              cp "$MSYS2_BIN/$dll" bin/ && echo "✓ Copied TIFF DLL: $dll" || echo "✗ Failed to copy: $dll"
+              cp "$MSYS2_BIN/$dll" bin/ && echo "✓ Copied TIFF/Image DLL: $dll" || echo "✗ Failed to copy: $dll"
             else
-              echo "⚠ TIFF DLL not found: $dll"
+              echo "⚠ TIFF/Image DLL not found: $dll"
+            fi
+          done
+
+          # Copy JPEG DLLs (ensure all variants)
+          echo "Copying JPEG DLLs..."
+          JPEG_DLLS="libjpeg-8.dll libjpeg.dll"
+          for dll in $JPEG_DLLS; do
+            if [ -f "$MSYS2_BIN/$dll" ]; then
+              cp "$MSYS2_BIN/$dll" bin/ && echo "✓ Copied JPEG DLL: $dll" || echo "✗ Failed to copy: $dll"
+            fi
+          done
+
+          # Copy WebP DLLs
+          echo "Copying WebP DLLs..."
+          WEBP_DLLS="libwebp-7.dll libwebp.dll"
+          for dll in $WEBP_DLLS; do
+            if [ -f "$MSYS2_BIN/$dll" ]; then
+              cp "$MSYS2_BIN/$dll" bin/ && echo "✓ Copied WebP DLL: $dll" || echo "✗ Failed to copy: $dll"
+            fi
+          done
+
+          # Copy Pixman DLLs (CRITICAL for Cairo)
+          echo "Copying Pixman DLLs..."
+          PIXMAN_DLLS="libpixman-1-0.dll libpixman-1.dll"
+          for dll in $PIXMAN_DLLS; do
+            if [ -f "$MSYS2_BIN/$dll" ]; then
+              cp "$MSYS2_BIN/$dll" bin/ && echo "✓ Copied Pixman DLL: $dll" || echo "✗ Failed to copy: $dll"
             fi
           done
 
@@ -528,7 +556,7 @@ jobs:
           fi
 
           echo "Checking for critical DLLs..."
-          CRITICAL_DLLS="libgcc_s_dw2-1.dll libwinpthread-1.dll libgtk-3-0.dll libglib-2.0-0.dll libgobject-2.0-0.dll libcairo-2.dll libcairo-gobject-2.dll zlib1.dll libpcre2-8-0.dll libtiff-6.dll"
+          CRITICAL_DLLS="libgcc_s_dw2-1.dll libwinpthread-1.dll libgtk-3-0.dll libglib-2.0-0.dll libgobject-2.0-0.dll libcairo-2.dll libcairo-gobject-2.dll zlib1.dll libpcre2-8-0.dll libtiff-6.dll libjpeg-8.dll libpixman-1-0.dll liblzma.dll libdeflate.dll libjbig-0.dll libLerc.dll libwebp-7.dll"
           MISSING_CRITICAL=0
           for dll in $CRITICAL_DLLS; do
             if [ -f "bin/$dll" ]; then
@@ -658,7 +686,7 @@ jobs:
           # Verify no obvious missing DLLs by checking common patterns
           echo ""
           echo "=== Pattern-based Verification ==="
-          PATTERNS_TO_CHECK="libgcc libwinpthread libgtk libgdk libglib libgobject libgio libgmodule libgthread libcairo libpango libatk libepoxy libgdk_pixbuf libintl libiconv libffi libharfbuzz libfreetype libfontconfig libpng libjpeg libtiff libpixman libexpat libz libbz2 liblzma libzstd libpcre2 zlib"
+          PATTERNS_TO_CHECK="libgcc libwinpthread libgtk libgdk libglib libgobject libgio libgmodule libgthread libcairo libpango libatk libepoxy libgdk_pixbuf libintl libiconv libffi libharfbuzz libfreetype libfontconfig libpng libjpeg libtiff libpixman libexpat libz libbz2 liblzma libzstd libpcre2 libdeflate libjbig libLerc libwebp zlib"
           for pattern in $PATTERNS_TO_CHECK; do
             DLLS_WITH_PATTERN=$(ls -1 bin/${pattern}*.dll 2>/dev/null | wc -l)
             if [ "$DLLS_WITH_PATTERN" -eq 0 ]; then
@@ -749,6 +777,45 @@ jobs:
             echo [OK] libtiff-5.dll found ^(libtiff-6.dll not found, but libtiff-5.dll present^)
           ) else (
             echo [ERROR] libtiff DLL MISSING - Application may not run!
+          )
+          echo.
+          echo Checking for image format DLLs...
+          if exist bin\libjpeg-8.dll (
+            echo [OK] libjpeg-8.dll found
+          ) else (
+            echo [ERROR] libjpeg-8.dll MISSING - Application will not run!
+          )
+          if exist bin\libpixman-1-0.dll (
+            echo [OK] libpixman-1-0.dll found
+          ) else (
+            echo [ERROR] libpixman-1-0.dll MISSING - Application will not run!
+          )
+          if exist bin\liblzma.dll (
+            echo [OK] liblzma.dll found
+          ) else if exist bin\liblzma-5.dll (
+            echo [OK] liblzma-5.dll found ^(liblzma.dll not found, but liblzma-5.dll present^)
+          ) else (
+            echo [ERROR] liblzma DLL MISSING - Application may not run!
+          )
+          if exist bin\libdeflate.dll (
+            echo [OK] libdeflate.dll found
+          ) else (
+            echo [ERROR] libdeflate.dll MISSING - Application will not run!
+          )
+          if exist bin\libjbig-0.dll (
+            echo [OK] libjbig-0.dll found
+          ) else (
+            echo [ERROR] libjbig-0.dll MISSING - Application will not run!
+          )
+          if exist bin\libLerc.dll (
+            echo [OK] libLerc.dll found
+          ) else (
+            echo [ERROR] libLerc.dll MISSING - Application will not run!
+          )
+          if exist bin\libwebp-7.dll (
+            echo [OK] libwebp-7.dll found
+          ) else (
+            echo [ERROR] libwebp-7.dll MISSING - Application will not run!
           )
 
       - name: Create Installer
