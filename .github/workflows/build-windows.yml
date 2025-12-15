@@ -202,7 +202,7 @@ jobs:
           NEW_DLLS="$DEPENDENCIES"
           ITERATION=0
           MAX_ITERATIONS=3
-          
+
           while [ $ITERATION -lt $MAX_ITERATIONS ]; do
             ITERATION=$((ITERATION + 1))
             echo "  Iteration $ITERATION: Finding dependencies..."
@@ -228,7 +228,7 @@ jobs:
             fi
             echo "  Found $(echo $NEW_DLLS | wc -w) new dependencies"
           done
-          
+
           # Remove duplicates and sort
           ALL_DLLS=$(echo "$ALL_DLLS" | tr ' ' '\n' | sort -u | tr '\n' ' ')
 
@@ -303,7 +303,7 @@ jobs:
               cp "$MSYS2_BIN/$dll" bin/ 2>/dev/null && echo "✓ Copied additional: $dll" || true
             fi
           done
-          
+
           # Verify critical Cairo DLLs are present
           echo ""
           echo "Verifying Cairo DLLs..."
@@ -361,7 +361,53 @@ jobs:
           fi
 
           echo "Verifying DLLs in bin directory..."
-          ls -la bin/*.dll | wc -l
+          DLL_COUNT=$(ls -1 bin/*.dll 2>/dev/null | wc -l)
+          echo "Total DLLs copied: $DLL_COUNT"
+          
+          # Comprehensive check: Find ALL DLLs required by the executable and verify they exist
+          echo ""
+          echo "=== Comprehensive DLL Dependency Check ==="
+          EXE_DEPS=$(objdump -p bin/stock_management.exe 2>/dev/null | grep "DLL Name:" | sed 's/.*DLL Name: //' | sort -u || echo "")
+          
+          MISSING_EXE_DEPS=""
+          for dep in $EXE_DEPS; do
+            # Skip system DLLs
+            if [[ "$dep" =~ ^(msvcrt|kernel32|user32|gdi32|advapi32|shell32|ole32|oleaut32|comctl32|comdlg32|ws2_32|ntdll|rpcrt4|sechost|shlwapi|version|winspool|imm32|winmm|usp10|dwmapi|uxtheme|dnsapi|iphlpapi|netapi32|wtsapi32|psapi|pdh|powrprof|setupapi|cfgmgr32|devobj|newdev|winusb|hid|setupapi|wininet|urlmon|winhttp|crypt32|cryptnet|bcrypt|ncrypt|wintrust|msasn1|rsaenh|gdiplus|msimg32|opengl32|glu32|d3d9|d3d11|dxgi|dinput8|xinput|dsound|winmm|msacm32|avrt|mf|mfplat|mfreadwrite|mfuuid|wmcodecdspuuid|propsys|sapi|sapi5|sapi51|sapi52|sapi53|sapi54|sapi55|sapi56|sapi57|sapi58|sapi59|sapi60|sapi61|sapi62|sapi63|sapi64|sapi65|sapi66|sapi67|sapi68|sapi69|sapi70|sapi71|sapi72|sapi73|sapi74|sapi75|sapi76|sapi77|sapi78|sapi79|sapi80|sapi81|sapi82|sapi83|sapi84|sapi85|sapi86|sapi87|sapi88|sapi89|sapi90|sapi91|sapi92|sapi93|sapi94|sapi95|sapi96|sapi97|sapi98|sapi99|sapi100)\.dll$ ]]; then
+              continue
+            fi
+            
+            if [ ! -f "bin/$dep" ]; then
+              MISSING_EXE_DEPS="$MISSING_EXE_DEPS $dep"
+              echo "✗ MISSING: $dep (required by executable)"
+            fi
+          done
+          
+          if [ -n "$MISSING_EXE_DEPS" ]; then
+            echo ""
+            echo "⚠ WARNING: Found missing DLLs required by executable!"
+            echo "Attempting to copy missing DLLs..."
+            for dep in $MISSING_EXE_DEPS; do
+              if [ -f "$MSYS2_BIN/$dep" ]; then
+                cp "$MSYS2_BIN/$dep" bin/ && echo "✓ Copied missing DLL: $dep" || echo "✗ Failed to copy: $dep"
+              else
+                echo "✗ Cannot find: $dep (may be system DLL or not available)"
+              fi
+            done
+          else
+            echo "✓ All DLLs required by executable are present!"
+          fi
+          
+          # Check for common GTK-related DLLs that might be missing
+          echo ""
+          echo "Checking for common GTK-related DLLs..."
+          COMMON_GTK_DLLS="libgailutil-3-0.dll libgtk-win32-2.0-0.dll libgtk-3-0.dll libgdk-3-0.dll libgdk-win32-2.0-0.dll"
+          for dll in $COMMON_GTK_DLLS; do
+            if [ -f "$MSYS2_BIN/$dll" ] && [ ! -f "bin/$dll" ]; then
+              cp "$MSYS2_BIN/$dll" bin/ 2>/dev/null && echo "✓ Copied additional GTK DLL: $dll" || true
+            fi
+          done
+          
+          echo ""
           echo "DLLs copied successfully"
 
       - name: Verify Executable and DLLs
@@ -412,30 +458,123 @@ jobs:
           echo "Verifying executable format..."
           file bin/stock_management.exe || echo "file command not available"
 
-          # Verify DLL dependencies can be resolved
-          echo "Checking DLL dependencies..."
+          # Comprehensive DLL dependency verification
+          echo "=== Final DLL Dependency Verification ==="
+          EXE_REQUIRED_DLLS=$(objdump -p bin/stock_management.exe 2>/dev/null | grep "DLL Name:" | sed 's/.*DLL Name: //' | sort -u || echo "")
+          
           MISSING_DLLS=""
-          for dll in $(objdump -p bin/stock_management.exe 2>/dev/null | grep "DLL Name:" | sed 's/.*DLL Name: //' | grep -v "^msvcrt.dll$" | grep -v "^kernel32.dll$" | grep -v "^user32.dll$" | grep -v "^gdi32.dll$" | grep -v "^advapi32.dll$" | grep -v "^shell32.dll$" | grep -v "^ole32.dll$" | grep -v "^oleaut32.dll$" | grep -v "^comctl32.dll$" | grep -v "^comdlg32.dll$" | grep -v "^ws2_32.dll$" | sort -u); do
-            if [ ! -f "bin/$dll" ]; then
+          SYSTEM_DLLS="msvcrt kernel32 user32 gdi32 advapi32 shell32 ole32 oleaut32 comctl32 comdlg32 ws2_32 ntdll rpcrt4 sechost shlwapi version winspool imm32 winmm usp10 dwmapi uxtheme"
+          
+          for dll in $EXE_REQUIRED_DLLS; do
+            # Check if it's a system DLL
+            IS_SYSTEM=0
+            for sys_dll in $SYSTEM_DLLS; do
+              if [[ "$dll" == "$sys_dll.dll" ]]; then
+                IS_SYSTEM=1
+                break
+              fi
+            done
+            
+            if [ $IS_SYSTEM -eq 0 ] && [ ! -f "bin/$dll" ]; then
               MISSING_DLLS="$MISSING_DLLS $dll"
+              echo "✗ MISSING: $dll (required by executable)"
             fi
           done
-
+          
           if [ -n "$MISSING_DLLS" ]; then
-            echo "⚠ WARNING: Missing DLLs in bin directory:"
-            echo "$MISSING_DLLS"
+            echo ""
+            echo "⚠ WARNING: Found missing DLLs required by executable!"
+            echo "Missing DLLs: $MISSING_DLLS"
+            echo ""
+            echo "Attempting to find and copy missing DLLs..."
+            for dll in $MISSING_DLLS; do
+              # Try to find in MSYS2 bin
+              if [ -f "$MSYS2_BIN/$dll" ]; then
+                cp "$MSYS2_BIN/$dll" bin/ && echo "✓ Copied: $dll" || echo "✗ Failed: $dll"
+              else
+                # Try to find in lib directories
+                FOUND=0
+                for lib_dir in /mingw32/lib /mingw32/bin; do
+                  if [ -f "$lib_dir/$dll" ]; then
+                    cp "$lib_dir/$dll" bin/ && echo "✓ Copied from $lib_dir: $dll" || echo "✗ Failed: $dll"
+                    FOUND=1
+                    break
+                  fi
+                done
+                if [ $FOUND -eq 0 ]; then
+                  echo "✗ Cannot locate: $dll"
+                fi
+              fi
+            done
           else
-            echo "✓ All non-system DLLs are present in bin directory"
+            echo "✓ All non-system DLLs required by executable are present!"
+          fi
+          
+          # Additional check: Verify all DLLs in bin can find their dependencies
+          echo ""
+          echo "Checking DLL dependencies recursively..."
+          BIN_DLLS=$(ls -1 bin/*.dll 2>/dev/null | xargs -n1 basename || echo "")
+          MISSING_TRANSITIVE=""
+          
+          for bin_dll in $BIN_DLLS; do
+            TRANS_DEPS=$(objdump -p "bin/$bin_dll" 2>/dev/null | grep "DLL Name:" | sed 's/.*DLL Name: //' | sort -u || echo "")
+            for trans_dep in $TRANS_DEPS; do
+              # Skip system DLLs
+              IS_SYSTEM=0
+              for sys_dll in $SYSTEM_DLLS; do
+                if [[ "$trans_dep" == "$sys_dll.dll" ]]; then
+                  IS_SYSTEM=1
+                  break
+                fi
+              done
+              
+              if [ $IS_SYSTEM -eq 0 ] && [ ! -f "bin/$trans_dep" ]; then
+                # Check if we already reported this
+                if ! echo "$MISSING_TRANSITIVE" | grep -q "$trans_dep"; then
+                  MISSING_TRANSITIVE="$MISSING_TRANSITIVE $trans_dep"
+                  echo "⚠ Transitive dependency missing: $trans_dep (required by $bin_dll)"
+                fi
+              fi
+            done
+          done
+          
+          if [ -n "$MISSING_TRANSITIVE" ]; then
+            echo ""
+            echo "Copying missing transitive dependencies..."
+            for dep in $MISSING_TRANSITIVE; do
+              if [ -f "$MSYS2_BIN/$dep" ]; then
+                cp "$MSYS2_BIN/$dep" bin/ && echo "✓ Copied transitive: $dep" || echo "✗ Failed: $dep"
+              fi
+            done
           fi
 
-          # List all DLLs in bin
+          # Final summary
           echo ""
-          echo "DLLs in bin directory:"
-          ls -1 bin/*.dll 2>/dev/null | wc -l | xargs echo "Total DLLs:"
-          ls -1 bin/*.dll 2>/dev/null | head -10
-          if [ $(ls -1 bin/*.dll 2>/dev/null | wc -l) -gt 10 ]; then
-            echo "... (and more)"
-          fi
+          echo "=== Final DLL Summary ==="
+          FINAL_DLL_COUNT=$(ls -1 bin/*.dll 2>/dev/null | wc -l)
+          echo "Total DLLs in bin directory: $FINAL_DLL_COUNT"
+          echo ""
+          echo "DLLs by category:"
+          echo "  MinGW Runtime: $(ls -1 bin/libgcc*.dll bin/libwinpthread*.dll 2>/dev/null | wc -l)"
+          echo "  GTK: $(ls -1 bin/libgtk*.dll bin/libgdk*.dll 2>/dev/null | wc -l)"
+          echo "  GLib: $(ls -1 bin/libglib*.dll bin/libgobject*.dll bin/libgio*.dll bin/libgmodule*.dll bin/libgthread*.dll 2>/dev/null | wc -l)"
+          echo "  Cairo: $(ls -1 bin/libcairo*.dll 2>/dev/null | wc -l)"
+          echo "  Pango: $(ls -1 bin/libpango*.dll 2>/dev/null | wc -l)"
+          echo "  Other: $(ls -1 bin/*.dll 2>/dev/null | grep -v -E "(libgcc|libwinpthread|libgtk|libgdk|libglib|libgobject|libgio|libgmodule|libgthread|libcairo|libpango)" | wc -l)"
+          echo ""
+          echo "All DLLs:"
+          ls -1 bin/*.dll 2>/dev/null | sort
+          
+          # Verify no obvious missing DLLs by checking common patterns
+          echo ""
+          echo "=== Pattern-based Verification ==="
+          PATTERNS_TO_CHECK="libgcc libwinpthread libgtk libgdk libglib libgobject libgio libgmodule libgthread libcairo libpango libatk libepoxy libgdk_pixbuf libintl libiconv libffi libharfbuzz libfreetype libfontconfig libpng libjpeg libtiff libpixman libexpat libz libbz2 liblzma libzstd"
+          for pattern in $PATTERNS_TO_CHECK; do
+            DLLS_WITH_PATTERN=$(ls -1 bin/${pattern}*.dll 2>/dev/null | wc -l)
+            if [ "$DLLS_WITH_PATTERN" -eq 0 ]; then
+              echo "⚠ No DLLs found matching pattern: $pattern"
+            fi
+          done
 
       - name: Create Standalone Package
         shell: C:\tools\msys64\usr\bin\bash.exe -l {0}
