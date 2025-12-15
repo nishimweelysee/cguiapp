@@ -72,31 +72,85 @@ jobs:
           mkdir -p bin obj data
           export PATH="/mingw64/bin:$PATH"
           export PKG_CONFIG_PATH="/mingw64/lib/pkgconfig"
-          echo "Building application..."
+          
+          echo "=== Build Configuration ==="
           echo "Compiler info:"
           which gcc || echo "gcc not in PATH"
-          gcc -v 2>&1 | head -3 || true
-          echo "Target architecture:"
-          gcc -dumpmachine || echo "Could not determine target"
+          GCC_TARGET=$(gcc -dumpmachine 2>/dev/null || echo "unknown")
+          echo "Target architecture: $GCC_TARGET"
+          
+          # Verify we're using 64-bit compiler
+          if [[ ! "$GCC_TARGET" == *"x86_64"* ]] && [[ ! "$GCC_TARGET" == *"64"* ]]; then
+            echo "WARNING: Compiler target doesn't appear to be 64-bit: $GCC_TARGET"
+            echo "Attempting to use explicit 64-bit compiler..."
+            if [ -f /mingw64/bin/x86_64-w64-mingw32-gcc.exe ]; then
+              export CC="/mingw64/bin/x86_64-w64-mingw32-gcc.exe"
+              echo "Using explicit 64-bit compiler: $CC"
+            fi
+          fi
+          
           echo "pkg-config output:"
-          pkg-config --cflags --libs gtk+-3.0
-          echo "Building 64-bit executable..."
-          gcc -Wall -Wextra -std=c11 -mwindows \
+          pkg-config --cflags --libs gtk+-3.0 || echo "ERROR: pkg-config failed!"
+          
+          echo "=== Building Application ==="
+          echo "Building 64-bit Windows executable..."
+          
+          # Build with explicit 64-bit flags
+          # Note: -mwindows sets subsystem to Windows (GUI), GTK handles entry point conversion
+          # Using -m64 explicitly ensures 64-bit build
+          gcc -Wall -Wextra -std=c11 \
+            -mwindows \
+            -m64 \
             -o bin/stock_management.exe \
             $(pkg-config --cflags --libs gtk+-3.0) \
             src/*.c \
             -L/mingw64/lib \
             -lgtk-3 -lgdk-3 -lgobject-2.0 -lglib-2.0 -lgio-2.0 -lpango-1.0 -lcairo -lgdk_pixbuf-2.0 -latk-1.0 -lpangocairo-1.0 -lpangoft2-1.0 -lepoxy
           
+          BUILD_EXIT_CODE=$?
+          
+          if [ $BUILD_EXIT_CODE -ne 0 ]; then
+            echo "ERROR: Build failed with exit code $BUILD_EXIT_CODE"
+            exit 1
+          fi
+          
           if [ ! -f bin/stock_management.exe ]; then
             echo "ERROR: Build failed - executable not created!"
             exit 1
           fi
           
-          echo "Build successful! Verifying executable..."
+          echo "=== Build Verification ==="
+          echo "Executable created successfully!"
           ls -lh bin/stock_management.exe
-          echo "Checking executable type:"
-          file bin/stock_management.exe || objdump -f bin/stock_management.exe | head -3 || echo "Could not verify executable format"
+          
+          # Verify executable format
+          echo "Checking executable format..."
+          if command -v file &> /dev/null; then
+            file bin/stock_management.exe || echo "file command failed"
+          fi
+          
+          # Use objdump to verify PE format and architecture
+          echo "Verifying PE format and architecture:"
+          objdump -f bin/stock_management.exe 2>/dev/null | head -10 || echo "objdump failed"
+          
+          # Check if it's a valid PE file by checking magic bytes
+          echo "Checking PE magic bytes..."
+          HEX_MAGIC=$(head -c 2 bin/stock_management.exe | od -An -tx1 | tr -d ' \n')
+          if [ "$HEX_MAGIC" = "4d5a" ] || [ "$HEX_MAGIC" = "5a4d" ]; then
+            echo "✓ Valid PE magic bytes found (MZ header)"
+          else
+            echo "✗ WARNING: Invalid PE magic bytes: $HEX_MAGIC"
+            echo "  Expected: 4d5a or 5a4d (MZ)"
+          fi
+          
+          # Verify it's 64-bit by checking PE header
+          echo "Checking architecture..."
+          ARCH_INFO=$(objdump -f bin/stock_management.exe 2>/dev/null | grep -i "architecture" || echo "")
+          if [[ "$ARCH_INFO" == *"x86-64"* ]] || [[ "$ARCH_INFO" == *"i386:x86-64"* ]]; then
+            echo "✓ Confirmed: 64-bit executable"
+          else
+            echo "⚠ Architecture info: $ARCH_INFO"
+          fi
 
       - name: Bundle DLLs
         shell: C:\tools\msys64\usr\bin\bash.exe -l {0}
@@ -120,29 +174,70 @@ jobs:
           DEPENDENCIES=$(objdump -p bin/stock_management.exe 2>/dev/null | grep "DLL Name:" | sed 's/.*DLL Name: //' | sort -u || echo "")
           
           if [ -z "$DEPENDENCIES" ]; then
-            echo "Warning: Could not extract dependencies automatically, using manual list"
-            # Manual list as fallback
+            echo "Warning: Could not extract dependencies automatically, using comprehensive manual list"
+            # Comprehensive manual list as fallback
             DEPENDENCIES="libgtk-3-0.dll libgdk-3-0.dll libglib-2.0-0.dll libgobject-2.0-0.dll libgio-2.0-0.dll libpango-1.0-0.dll libcairo-2.dll libpangoft2-1.0-0.dll libpangocairo-1.0-0.dll libgdk_pixbuf-2.0-0.dll libatk-1.0-0.dll libepoxy-0.dll libintl-8.dll libiconv-2.dll libwinpthread-1.dll libffi-8.dll libbz2-1.dll libharfbuzz-0.dll libfreetype-6.dll libfontconfig-1.dll libpng16-16.dll libjpeg-8.dll libtiff-5.dll libpixman-1-0.dll libexpat-1.dll libzstd.dll liblzma-5.dll libz-1.dll"
           fi
 
-          echo "Dependencies found:"
+          echo "Direct dependencies found:"
           echo "$DEPENDENCIES"
+          echo ""
 
-          # Copy all dependencies recursively
-          echo "Copying DLLs..."
+          # Function to recursively find DLL dependencies
+          find_dll_deps() {
+            local dll_name=$1
+            local deps=""
+            if [ -f "$MSYS2_BIN/$dll_name" ]; then
+              # Get dependencies of this DLL
+              deps=$(objdump -p "$MSYS2_BIN/$dll_name" 2>/dev/null | grep "DLL Name:" | sed 's/.*DLL Name: //' | grep -v "^msvcrt.dll$" | grep -v "^kernel32.dll$" | grep -v "^user32.dll$" | grep -v "^gdi32.dll$" | sort -u || echo "")
+            fi
+            echo "$deps"
+          }
+
+          # Collect all DLLs to copy (direct + transitive)
+          ALL_DLLS="$DEPENDENCIES"
+          
+          # Add transitive dependencies (one level deep)
+          echo "Finding transitive dependencies..."
           for dll in $DEPENDENCIES; do
+            TRANS_DEPS=$(find_dll_deps "$dll")
+            if [ -n "$TRANS_DEPS" ]; then
+              ALL_DLLS="$ALL_DLLS $TRANS_DEPS"
+            fi
+          done
+          
+          # Remove duplicates and sort
+          ALL_DLLS=$(echo "$ALL_DLLS" | tr ' ' '\n' | sort -u | tr '\n' ' ')
+
+          echo "All DLLs to copy (including transitive):"
+          echo "$ALL_DLLS"
+          echo ""
+
+          # Copy all dependencies
+          echo "Copying DLLs..."
+          COPY_COUNT=0
+          MISSING_COUNT=0
+          for dll in $ALL_DLLS; do
             if [ -f "$MSYS2_BIN/$dll" ]; then
-              cp "$MSYS2_BIN/$dll" bin/ && echo "Copied: $dll" || echo "Failed: $dll"
+              cp "$MSYS2_BIN/$dll" bin/ && {
+                echo "✓ Copied: $dll"
+                COPY_COUNT=$((COPY_COUNT + 1))
+              } || echo "✗ Failed: $dll"
             else
-              echo "Warning: $dll not found in $MSYS2_BIN"
+              echo "⚠ Not found: $dll (may be system DLL)"
+              MISSING_COUNT=$((MISSING_COUNT + 1))
             fi
           done
 
+          echo ""
+          echo "DLL copy summary: $COPY_COUNT copied, $MISSING_COUNT not found (may be system DLLs)"
+
           # Copy additional common DLLs that might be needed
-          ADDITIONAL_DLLS="libzstd.dll liblzma-5.dll libz-1.dll libbrotlidec.dll libbrotlicommon.dll libgraphite2.dll libdatrie-1.dll libthai-0.dll"
+          echo "Copying additional common DLLs..."
+          ADDITIONAL_DLLS="libbrotlidec.dll libbrotlicommon.dll libgraphite2.dll libdatrie-1.dll libthai-0.dll libfribidi-0.dll"
           for dll in $ADDITIONAL_DLLS; do
             if [ -f "$MSYS2_BIN/$dll" ]; then
-              cp "$MSYS2_BIN/$dll" bin/ 2>/dev/null || true
+              cp "$MSYS2_BIN/$dll" bin/ 2>/dev/null && echo "✓ Copied additional: $dll" || true
             fi
           done
 
@@ -208,6 +303,31 @@ jobs:
 
           echo "Verifying executable format..."
           file bin/stock_management.exe || echo "file command not available"
+          
+          # Verify DLL dependencies can be resolved
+          echo "Checking DLL dependencies..."
+          MISSING_DLLS=""
+          for dll in $(objdump -p bin/stock_management.exe 2>/dev/null | grep "DLL Name:" | sed 's/.*DLL Name: //' | grep -v "^msvcrt.dll$" | grep -v "^kernel32.dll$" | grep -v "^user32.dll$" | grep -v "^gdi32.dll$" | grep -v "^advapi32.dll$" | grep -v "^shell32.dll$" | grep -v "^ole32.dll$" | grep -v "^oleaut32.dll$" | grep -v "^comctl32.dll$" | grep -v "^comdlg32.dll$" | grep -v "^ws2_32.dll$" | sort -u); do
+            if [ ! -f "bin/$dll" ]; then
+              MISSING_DLLS="$MISSING_DLLS $dll"
+            fi
+          done
+          
+          if [ -n "$MISSING_DLLS" ]; then
+            echo "⚠ WARNING: Missing DLLs in bin directory:"
+            echo "$MISSING_DLLS"
+          else
+            echo "✓ All non-system DLLs are present in bin directory"
+          fi
+          
+          # List all DLLs in bin
+          echo ""
+          echo "DLLs in bin directory:"
+          ls -1 bin/*.dll 2>/dev/null | wc -l | xargs echo "Total DLLs:"
+          ls -1 bin/*.dll 2>/dev/null | head -10
+          if [ $(ls -1 bin/*.dll 2>/dev/null | wc -l) -gt 10 ]; then
+            echo "... (and more)"
+          fi
 
       - name: Create Standalone Package
         shell: C:\tools\msys64\usr\bin\bash.exe -l {0}
@@ -234,6 +354,23 @@ jobs:
           choco install innosetup -y
           refreshenv
 
+      - name: Verify Before Installer Creation
+        shell: cmd
+        run: |
+          echo Verifying executable before creating installer...
+          if not exist bin\stock_management.exe (
+            echo ERROR: stock_management.exe not found!
+            exit /b 1
+          )
+          echo Executable size:
+          dir bin\stock_management.exe
+          echo.
+          echo DLL count:
+          dir /b bin\*.dll | find /c ".dll"
+          echo.
+          echo Verifying PE format...
+          powershell -Command "Get-Content bin\stock_management.exe -TotalCount 2 -Encoding Byte | ForEach-Object { '{0:X2}' -f $_ }"
+          
       - name: Create Installer
         shell: cmd
         run: |
@@ -241,6 +378,17 @@ jobs:
             "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" StockManagement_Installer_WithGTK.iss
           ) else if exist StockManagement_Installer.iss (
             "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" StockManagement_Installer.iss
+          )
+          
+      - name: Verify Installer Contents
+        shell: cmd
+        run: |
+          echo Verifying installer was created...
+          if exist installer\*.exe (
+            echo Installer created successfully
+            dir installer\*.exe
+          ) else (
+            echo WARNING: No installer found in installer directory
           )
 
       - name: Upload Installer
