@@ -176,7 +176,8 @@ jobs:
           if [ -z "$DEPENDENCIES" ]; then
             echo "Warning: Could not extract dependencies automatically, using comprehensive manual list"
             # Comprehensive manual list as fallback (includes MinGW runtime DLLs and all Cairo DLLs)
-            DEPENDENCIES="libgcc_s_dw2-1.dll libwinpthread-1.dll libgtk-3-0.dll libgdk-3-0.dll libglib-2.0-0.dll libgobject-2.0-0.dll libgio-2.0-0.dll libpango-1.0-0.dll libcairo-2.dll libcairo-gobject-2.dll libpangoft2-1.0-0.dll libpangocairo-1.0-0.dll libgdk_pixbuf-2.0-0.dll libatk-1.0-0.dll libepoxy-0.dll libintl-8.dll libiconv-2.dll libffi-8.dll libbz2-1.dll libharfbuzz-0.dll libfreetype-6.dll libfontconfig-1.dll libpng16-16.dll libjpeg-8.dll libtiff-5.dll libpixman-1-0.dll libexpat-1.dll libzstd.dll liblzma-5.dll libz-1.dll"
+            # Note: Includes both libtiff-5.dll and libtiff-6.dll for compatibility
+            DEPENDENCIES="libgcc_s_dw2-1.dll libwinpthread-1.dll libgtk-3-0.dll libgdk-3-0.dll libglib-2.0-0.dll libgobject-2.0-0.dll libgio-2.0-0.dll libpango-1.0-0.dll libcairo-2.dll libcairo-gobject-2.dll libpangoft2-1.0-0.dll libpangocairo-1.0-0.dll libgdk_pixbuf-2.0-0.dll libatk-1.0-0.dll libepoxy-0.dll libintl-8.dll libiconv-2.dll libffi-8.dll libbz2-1.dll libharfbuzz-0.dll libfreetype-6.dll libfontconfig-1.dll libpng16-16.dll libjpeg-8.dll libtiff-5.dll libtiff-6.dll libpixman-1-0.dll libexpat-1.dll libzstd.dll liblzma-5.dll libz-1.dll zlib1.dll libpcre2-8-0.dll libpcre2-16-0.dll libpcre2-32-0.dll"
           fi
 
           echo "Direct dependencies found:"
@@ -263,6 +264,39 @@ jobs:
               cp "$MSYS2_BIN/$dll" bin/ && echo "✓ Copied MinGW runtime: $dll" || echo "✗ Failed to copy: $dll"
             else
               echo "⚠ MinGW runtime DLL not found: $dll (may not be needed for this build)"
+            fi
+          done
+
+          # Copy compression and utility DLLs (CRITICAL - commonly missing)
+          echo "Copying compression and utility DLLs..."
+          COMPRESSION_DLLS="zlib1.dll libz-1.dll libbz2-1.dll liblzma-5.dll libzstd.dll"
+          for dll in $COMPRESSION_DLLS; do
+            if [ -f "$MSYS2_BIN/$dll" ]; then
+              cp "$MSYS2_BIN/$dll" bin/ && echo "✓ Copied compression DLL: $dll" || echo "✗ Failed to copy: $dll"
+            else
+              echo "⚠ Compression DLL not found: $dll"
+            fi
+          done
+
+          # Copy PCRE2 DLLs (CRITICAL - used by GLib for regex)
+          echo "Copying PCRE2 DLLs..."
+          PCRE2_DLLS="libpcre2-8-0.dll libpcre2-16-0.dll libpcre2-32-0.dll"
+          for dll in $PCRE2_DLLS; do
+            if [ -f "$MSYS2_BIN/$dll" ]; then
+              cp "$MSYS2_BIN/$dll" bin/ && echo "✓ Copied PCRE2 DLL: $dll" || echo "✗ Failed to copy: $dll"
+            else
+              echo "⚠ PCRE2 DLL not found: $dll"
+            fi
+          done
+
+          # Copy TIFF DLLs (both versions for compatibility)
+          echo "Copying TIFF DLLs..."
+          TIFF_DLLS="libtiff-5.dll libtiff-6.dll"
+          for dll in $TIFF_DLLS; do
+            if [ -f "$MSYS2_BIN/$dll" ]; then
+              cp "$MSYS2_BIN/$dll" bin/ && echo "✓ Copied TIFF DLL: $dll" || echo "✗ Failed to copy: $dll"
+            else
+              echo "⚠ TIFF DLL not found: $dll"
             fi
           done
 
@@ -363,12 +397,12 @@ jobs:
           echo "Verifying DLLs in bin directory..."
           DLL_COUNT=$(ls -1 bin/*.dll 2>/dev/null | wc -l)
           echo "Total DLLs copied: $DLL_COUNT"
-          
+
           # Comprehensive check: Find ALL DLLs required by the executable and verify they exist
           echo ""
           echo "=== Comprehensive DLL Dependency Check ==="
           EXE_DEPS=$(objdump -p bin/stock_management.exe 2>/dev/null | grep "DLL Name:" | sed 's/.*DLL Name: //' | sort -u || echo "")
-          
+
           MISSING_EXE_DEPS=""
           for dep in $EXE_DEPS; do
             # Skip system DLLs
@@ -381,7 +415,7 @@ jobs:
               echo "✗ MISSING: $dep (required by executable)"
             fi
           done
-          
+
           if [ -n "$MISSING_EXE_DEPS" ]; then
             echo ""
             echo "⚠ WARNING: Found missing DLLs required by executable!"
@@ -396,7 +430,7 @@ jobs:
           else
             echo "✓ All DLLs required by executable are present!"
           fi
-          
+
           # Check for common GTK-related DLLs that might be missing
           echo ""
           echo "Checking for common GTK-related DLLs..."
@@ -406,9 +440,26 @@ jobs:
               cp "$MSYS2_BIN/$dll" bin/ 2>/dev/null && echo "✓ Copied additional GTK DLL: $dll" || true
             fi
           done
-          
+
           echo ""
           echo "DLLs copied successfully"
+
+          # Create a dependency report for debugging
+          echo ""
+          echo "=== Creating Dependency Report ==="
+          {
+            echo "=== DLL Dependency Report ==="
+            echo "Generated: $(date)"
+            echo ""
+            echo "Executable: bin/stock_management.exe"
+            echo ""
+            echo "Direct Dependencies:"
+            objdump -p bin/stock_management.exe 2>/dev/null | grep "DLL Name:" | sed 's/.*DLL Name: /  - /' || echo "  (could not extract)"
+            echo ""
+            echo "DLLs in bin directory:"
+            ls -1 bin/*.dll 2>/dev/null | xargs -n1 basename | sed 's/^/  - /' || echo "  (none found)"
+          } > bin/dependency_report.txt 2>/dev/null || true
+          echo "Dependency report saved to bin/dependency_report.txt"
 
       - name: Verify Executable and DLLs
         shell: C:\tools\msys64\usr\bin\bash.exe -l {0}
@@ -438,7 +489,7 @@ jobs:
           fi
 
           echo "Checking for critical DLLs..."
-          CRITICAL_DLLS="libgcc_s_dw2-1.dll libwinpthread-1.dll libgtk-3-0.dll libglib-2.0-0.dll libgobject-2.0-0.dll libcairo-2.dll libcairo-gobject-2.dll"
+          CRITICAL_DLLS="libgcc_s_dw2-1.dll libwinpthread-1.dll libgtk-3-0.dll libglib-2.0-0.dll libgobject-2.0-0.dll libcairo-2.dll libcairo-gobject-2.dll zlib1.dll libpcre2-8-0.dll libtiff-6.dll"
           MISSING_CRITICAL=0
           for dll in $CRITICAL_DLLS; do
             if [ -f "bin/$dll" ]; then
@@ -461,10 +512,10 @@ jobs:
           # Comprehensive DLL dependency verification
           echo "=== Final DLL Dependency Verification ==="
           EXE_REQUIRED_DLLS=$(objdump -p bin/stock_management.exe 2>/dev/null | grep "DLL Name:" | sed 's/.*DLL Name: //' | sort -u || echo "")
-          
+
           MISSING_DLLS=""
           SYSTEM_DLLS="msvcrt kernel32 user32 gdi32 advapi32 shell32 ole32 oleaut32 comctl32 comdlg32 ws2_32 ntdll rpcrt4 sechost shlwapi version winspool imm32 winmm usp10 dwmapi uxtheme"
-          
+
           for dll in $EXE_REQUIRED_DLLS; do
             # Check if it's a system DLL
             IS_SYSTEM=0
@@ -480,7 +531,7 @@ jobs:
               echo "✗ MISSING: $dll (required by executable)"
             fi
           done
-          
+
           if [ -n "$MISSING_DLLS" ]; then
             echo ""
             echo "⚠ WARNING: Found missing DLLs required by executable!"
@@ -509,13 +560,13 @@ jobs:
           else
             echo "✓ All non-system DLLs required by executable are present!"
           fi
-          
+
           # Additional check: Verify all DLLs in bin can find their dependencies
           echo ""
           echo "Checking DLL dependencies recursively..."
           BIN_DLLS=$(ls -1 bin/*.dll 2>/dev/null | xargs -n1 basename || echo "")
           MISSING_TRANSITIVE=""
-          
+
           for bin_dll in $BIN_DLLS; do
             TRANS_DEPS=$(objdump -p "bin/$bin_dll" 2>/dev/null | grep "DLL Name:" | sed 's/.*DLL Name: //' | sort -u || echo "")
             for trans_dep in $TRANS_DEPS; do
@@ -537,7 +588,7 @@ jobs:
               fi
             done
           done
-          
+
           if [ -n "$MISSING_TRANSITIVE" ]; then
             echo ""
             echo "Copying missing transitive dependencies..."
@@ -564,11 +615,11 @@ jobs:
           echo ""
           echo "All DLLs:"
           ls -1 bin/*.dll 2>/dev/null | sort
-          
+
           # Verify no obvious missing DLLs by checking common patterns
           echo ""
           echo "=== Pattern-based Verification ==="
-          PATTERNS_TO_CHECK="libgcc libwinpthread libgtk libgdk libglib libgobject libgio libgmodule libgthread libcairo libpango libatk libepoxy libgdk_pixbuf libintl libiconv libffi libharfbuzz libfreetype libfontconfig libpng libjpeg libtiff libpixman libexpat libz libbz2 liblzma libzstd"
+          PATTERNS_TO_CHECK="libgcc libwinpthread libgtk libgdk libglib libgobject libgio libgmodule libgthread libcairo libpango libatk libepoxy libgdk_pixbuf libintl libiconv libffi libharfbuzz libfreetype libfontconfig libpng libjpeg libtiff libpixman libexpat libz libbz2 liblzma libzstd libpcre2 zlib"
           for pattern in $PATTERNS_TO_CHECK; do
             DLLS_WITH_PATTERN=$(ls -1 bin/${pattern}*.dll 2>/dev/null | wc -l)
             if [ "$DLLS_WITH_PATTERN" -eq 0 ]; then
@@ -640,6 +691,25 @@ jobs:
             echo [OK] libcairo-gobject-2.dll found
           ) else (
             echo [ERROR] libcairo-gobject-2.dll MISSING - Application will not run!
+          )
+          echo.
+          echo Checking for compression and utility DLLs...
+          if exist bin\zlib1.dll (
+            echo [OK] zlib1.dll found
+          ) else (
+            echo [ERROR] zlib1.dll MISSING - Application will not run!
+          )
+          if exist bin\libpcre2-8-0.dll (
+            echo [OK] libpcre2-8-0.dll found
+          ) else (
+            echo [ERROR] libpcre2-8-0.dll MISSING - Application will not run!
+          )
+          if exist bin\libtiff-6.dll (
+            echo [OK] libtiff-6.dll found
+          ) else if exist bin\libtiff-5.dll (
+            echo [OK] libtiff-5.dll found ^(libtiff-6.dll not found, but libtiff-5.dll present^)
+          ) else (
+            echo [ERROR] libtiff DLL MISSING - Application may not run!
           )
 
       - name: Create Installer
