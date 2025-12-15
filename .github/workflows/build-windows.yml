@@ -73,14 +73,30 @@ jobs:
           export PATH="/mingw64/bin:$PATH"
           export PKG_CONFIG_PATH="/mingw64/lib/pkgconfig"
           echo "Building application..."
+          echo "Compiler info:"
+          which gcc || echo "gcc not in PATH"
+          gcc -v 2>&1 | head -3 || true
+          echo "Target architecture:"
+          gcc -dumpmachine || echo "Could not determine target"
           echo "pkg-config output:"
           pkg-config --cflags --libs gtk+-3.0
+          echo "Building 64-bit executable..."
           gcc -Wall -Wextra -std=c11 -mwindows \
             -o bin/stock_management.exe \
             $(pkg-config --cflags --libs gtk+-3.0) \
             src/*.c \
             -L/mingw64/lib \
             -lgtk-3 -lgdk-3 -lgobject-2.0 -lglib-2.0 -lgio-2.0 -lpango-1.0 -lcairo -lgdk_pixbuf-2.0 -latk-1.0 -lpangocairo-1.0 -lpangoft2-1.0 -lepoxy
+          
+          if [ ! -f bin/stock_management.exe ]; then
+            echo "ERROR: Build failed - executable not created!"
+            exit 1
+          fi
+          
+          echo "Build successful! Verifying executable..."
+          ls -lh bin/stock_management.exe
+          echo "Checking executable type:"
+          file bin/stock_management.exe || objdump -f bin/stock_management.exe | head -3 || echo "Could not verify executable format"
 
       - name: Bundle DLLs
         shell: C:\tools\msys64\usr\bin\bash.exe -l {0}
@@ -96,40 +112,48 @@ jobs:
           cd "$MSYS_PATH"
           MSYS2_BIN=/mingw64/bin
 
-          # Copy essential DLLs
-          cp $MSYS2_BIN/libgtk-3-0.dll bin/ 2>/dev/null || true
-          cp $MSYS2_BIN/libgdk-3-0.dll bin/ 2>/dev/null || true
-          cp $MSYS2_BIN/libglib-2.0-0.dll bin/ 2>/dev/null || true
-          cp $MSYS2_BIN/libgobject-2.0-0.dll bin/ 2>/dev/null || true
-          cp $MSYS2_BIN/libgio-2.0-0.dll bin/ 2>/dev/null || true
-          cp $MSYS2_BIN/libpango-1.0-0.dll bin/ 2>/dev/null || true
-          cp $MSYS2_BIN/libcairo-2.dll bin/ 2>/dev/null || true
-          cp $MSYS2_BIN/libpangoft2-1.0-0.dll bin/ 2>/dev/null || true
-          cp $MSYS2_BIN/libpangocairo-1.0-0.dll bin/ 2>/dev/null || true
-          cp $MSYS2_BIN/libgdk_pixbuf-2.0-0.dll bin/ 2>/dev/null || true
-          cp $MSYS2_BIN/libatk-1.0-0.dll bin/ 2>/dev/null || true
-          cp $MSYS2_BIN/libepoxy-0.dll bin/ 2>/dev/null || true
+          echo "Verifying executable architecture..."
+          file bin/stock_management.exe || objdump -f bin/stock_management.exe | head -5 || echo "Could not verify architecture"
 
-          # Copy additional dependencies
-          cp $MSYS2_BIN/libintl-8.dll bin/ 2>/dev/null || true
-          cp $MSYS2_BIN/libiconv-2.dll bin/ 2>/dev/null || true
-          cp $MSYS2_BIN/libwinpthread-1.dll bin/ 2>/dev/null || true
-          cp $MSYS2_BIN/libffi-8.dll bin/ 2>/dev/null || true
-          cp $MSYS2_BIN/libbz2-1.dll bin/ 2>/dev/null || true
-          cp $MSYS2_BIN/libharfbuzz-0.dll bin/ 2>/dev/null || true
-          cp $MSYS2_BIN/libfreetype-6.dll bin/ 2>/dev/null || true
-          cp $MSYS2_BIN/libfontconfig-1.dll bin/ 2>/dev/null || true
-          cp $MSYS2_BIN/libpng16-16.dll bin/ 2>/dev/null || true
-          cp $MSYS2_BIN/libjpeg-8.dll bin/ 2>/dev/null || true
-          cp $MSYS2_BIN/libtiff-5.dll bin/ 2>/dev/null || true
-          cp $MSYS2_BIN/libpixman-1-0.dll bin/ 2>/dev/null || true
-          cp $MSYS2_BIN/libexpat-1.dll bin/ 2>/dev/null || true
+          echo "Finding all DLL dependencies..."
+          # Use objdump to find all DLL dependencies
+          DEPENDENCIES=$(objdump -p bin/stock_management.exe 2>/dev/null | grep "DLL Name:" | sed 's/.*DLL Name: //' | sort -u || echo "")
+          
+          if [ -z "$DEPENDENCIES" ]; then
+            echo "Warning: Could not extract dependencies automatically, using manual list"
+            # Manual list as fallback
+            DEPENDENCIES="libgtk-3-0.dll libgdk-3-0.dll libglib-2.0-0.dll libgobject-2.0-0.dll libgio-2.0-0.dll libpango-1.0-0.dll libcairo-2.dll libpangoft2-1.0-0.dll libpangocairo-1.0-0.dll libgdk_pixbuf-2.0-0.dll libatk-1.0-0.dll libepoxy-0.dll libintl-8.dll libiconv-2.dll libwinpthread-1.dll libffi-8.dll libbz2-1.dll libharfbuzz-0.dll libfreetype-6.dll libfontconfig-1.dll libpng16-16.dll libjpeg-8.dll libtiff-5.dll libpixman-1-0.dll libexpat-1.dll libzstd.dll liblzma-5.dll libz-1.dll"
+          fi
+
+          echo "Dependencies found:"
+          echo "$DEPENDENCIES"
+
+          # Copy all dependencies recursively
+          echo "Copying DLLs..."
+          for dll in $DEPENDENCIES; do
+            if [ -f "$MSYS2_BIN/$dll" ]; then
+              cp "$MSYS2_BIN/$dll" bin/ && echo "Copied: $dll" || echo "Failed: $dll"
+            else
+              echo "Warning: $dll not found in $MSYS2_BIN"
+            fi
+          done
+
+          # Copy additional common DLLs that might be needed
+          ADDITIONAL_DLLS="libzstd.dll liblzma-5.dll libz-1.dll libbrotlidec.dll libbrotlicommon.dll libgraphite2.dll libdatrie-1.dll libthai-0.dll"
+          for dll in $ADDITIONAL_DLLS; do
+            if [ -f "$MSYS2_BIN/$dll" ]; then
+              cp "$MSYS2_BIN/$dll" bin/ 2>/dev/null || true
+            fi
+          done
 
           # Copy GTK data files
+          echo "Copying GTK data files..."
           if [ -d /mingw64/share/gtk-3.0 ]; then
             mkdir -p bin/share
             cp -r /mingw64/share/gtk-3.0 bin/share/ 2>/dev/null || true
             cp -r /mingw64/share/glib-2.0 bin/share/ 2>/dev/null || true
+            cp -r /mingw64/share/icons bin/share/ 2>/dev/null || true
+            cp -r /mingw64/share/themes bin/share/ 2>/dev/null || true
           fi
 
           # Create data folder
@@ -137,8 +161,53 @@ jobs:
 
           # Compile schemas if glib-compile-schemas exists
           if [ -f /mingw64/bin/glib-compile-schemas.exe ] && [ -d bin/share/glib-2.0/schemas ]; then
+            echo "Compiling GLib schemas..."
             /mingw64/bin/glib-compile-schemas.exe bin/share/glib-2.0/schemas 2>/dev/null || true
           fi
+
+          echo "Verifying DLLs in bin directory..."
+          ls -la bin/*.dll | wc -l
+          echo "DLLs copied successfully"
+
+      - name: Verify Executable and DLLs
+        shell: C:\tools\msys64\usr\bin\bash.exe -l {0}
+        run: |
+          WIN_PATH="${{ github.workspace }}"
+          DRIVE=$(echo "$WIN_PATH" | cut -d: -f1 | tr '[:upper:]' '[:lower:]')
+          PATH_PART=$(echo "$WIN_PATH" | cut -d: -f2 | sed 's|\\|/|g')
+          if [ "${PATH_PART:0:1}" != "/" ]; then
+            PATH_PART="/$PATH_PART"
+          fi
+          MSYS_PATH="/$DRIVE$PATH_PART"
+          cd "$MSYS_PATH"
+
+          echo "=== Verification ==="
+          echo "Checking executable..."
+          if [ ! -f bin/stock_management.exe ]; then
+            echo "ERROR: stock_management.exe not found!"
+            exit 1
+          fi
+
+          echo "Checking DLL count..."
+          DLL_COUNT=$(ls bin/*.dll 2>/dev/null | wc -l)
+          echo "Found $DLL_COUNT DLL files"
+
+          if [ "$DLL_COUNT" -lt 20 ]; then
+            echo "WARNING: Expected at least 20 DLLs, found only $DLL_COUNT"
+          fi
+
+          echo "Checking for critical DLLs..."
+          CRITICAL_DLLS="libgtk-3-0.dll libglib-2.0-0.dll libgobject-2.0-0.dll"
+          for dll in $CRITICAL_DLLS; do
+            if [ -f "bin/$dll" ]; then
+              echo "✓ Found: $dll"
+            else
+              echo "✗ Missing: $dll"
+            fi
+          done
+
+          echo "Verifying executable format..."
+          file bin/stock_management.exe || echo "file command not available"
 
       - name: Create Standalone Package
         shell: C:\tools\msys64\usr\bin\bash.exe -l {0}
