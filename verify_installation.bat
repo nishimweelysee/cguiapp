@@ -62,7 +62,7 @@ if %DLL_COUNT% LSS 20 (
 )
 echo.
 
-REM Check critical DLLs (including MinGW runtime, Cairo, compression, and utility DLLs)
+REM Check critical DLLs (including MinGW runtime, Cairo, compression, image formats, and utility DLLs)
 echo Checking critical DLLs...
 set MISSING=0
 for %%d in (
@@ -77,6 +77,13 @@ for %%d in (
     zlib1.dll
     libpcre2-8-0.dll
     libtiff-6.dll
+    libjpeg-8.dll
+    libpixman-1-0.dll
+    liblzma.dll
+    libdeflate.dll
+    libjbig-0.dll
+    libLerc.dll
+    libwebp-7.dll
 ) do (
     if exist "%APP_DIR%\%%d" (
         echo [OK] Found: %%d

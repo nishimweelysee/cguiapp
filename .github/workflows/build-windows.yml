@@ -352,6 +352,45 @@ jobs:
             echo "✗ ERROR: libcairo-gobject-2.dll missing!"
           fi
 
+          # Verify compression DLLs
+          echo ""
+          echo "Verifying compression DLLs..."
+          if [ -f "bin/zlib1.dll" ]; then
+            echo "✓ zlib1.dll found"
+          elif [ -f "bin/libz-1.dll" ]; then
+            echo "✓ libz-1.dll found (alternative to zlib1.dll)"
+            # Try to copy zlib1.dll if it exists with different name
+            if [ -f "$MSYS2_BIN/zlib1.dll" ] && [ ! -f "bin/zlib1.dll" ]; then
+              cp "$MSYS2_BIN/zlib1.dll" bin/ && echo "✓ Also copied zlib1.dll"
+            fi
+          else
+            echo "✗ ERROR: zlib1.dll or libz-1.dll missing!"
+          fi
+
+          # Verify PCRE2 DLLs
+          echo ""
+          echo "Verifying PCRE2 DLLs..."
+          if [ -f "bin/libpcre2-8-0.dll" ]; then
+            echo "✓ libpcre2-8-0.dll found"
+          else
+            echo "✗ ERROR: libpcre2-8-0.dll missing!"
+          fi
+
+          # Verify TIFF DLLs
+          echo ""
+          echo "Verifying TIFF DLLs..."
+          if [ -f "bin/libtiff-6.dll" ]; then
+            echo "✓ libtiff-6.dll found"
+          elif [ -f "bin/libtiff-5.dll" ]; then
+            echo "⚠ libtiff-5.dll found (but libtiff-6.dll may be required)"
+            # Try to copy libtiff-6.dll if available
+            if [ -f "$MSYS2_BIN/libtiff-6.dll" ]; then
+              cp "$MSYS2_BIN/libtiff-6.dll" bin/ && echo "✓ Also copied libtiff-6.dll"
+            fi
+          else
+            echo "✗ ERROR: No TIFF DLL found!"
+          fi
+
           # Copy any remaining DLLs matching common GTK/Cairo patterns (safety net)
           echo ""
           echo "Copying any remaining GTK/Cairo/GLib DLLs (safety net)..."
