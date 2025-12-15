@@ -62,7 +62,7 @@ if %DLL_COUNT% LSS 20 (
 )
 echo.
 
-REM Check critical DLLs (including MinGW runtime)
+REM Check critical DLLs (including MinGW runtime and Cairo)
 echo Checking critical DLLs...
 set MISSING=0
 for %%d in (
@@ -72,6 +72,8 @@ for %%d in (
     libglib-2.0-0.dll
     libgobject-2.0-0.dll
     libgdk-3-0.dll
+    libcairo-2.dll
+    libcairo-gobject-2.dll
 ) do (
     if exist "%APP_DIR%\%%d" (
         echo [OK] Found: %%d

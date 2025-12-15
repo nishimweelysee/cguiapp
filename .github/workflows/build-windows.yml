@@ -72,13 +72,13 @@ jobs:
           mkdir -p bin obj data
           export PATH="/mingw32/bin:$PATH"
           export PKG_CONFIG_PATH="/mingw32/lib/pkgconfig"
-          
+
           echo "=== Build Configuration ==="
           echo "Compiler info:"
           which gcc || echo "gcc not in PATH"
           GCC_TARGET=$(gcc -dumpmachine 2>/dev/null || echo "unknown")
           echo "Target architecture: $GCC_TARGET"
-          
+
           # Verify we're using 32-bit compiler
           if [[ ! "$GCC_TARGET" == *"i686"* ]] && [[ ! "$GCC_TARGET" == *"i386"* ]]; then
             echo "WARNING: Compiler target doesn't appear to be 32-bit: $GCC_TARGET"
@@ -88,13 +88,13 @@ jobs:
               echo "Using explicit 32-bit compiler: $CC"
             fi
           fi
-          
+
           echo "pkg-config output:"
           pkg-config --cflags --libs gtk+-3.0 || echo "ERROR: pkg-config failed!"
-          
+
           echo "=== Building Application ==="
           echo "Building 32-bit Windows executable..."
-          
+
           # Build with explicit 32-bit flags
           # Note: -mwindows sets subsystem to Windows (GUI), GTK handles entry point conversion
           # Using -m32 explicitly ensures 32-bit build
@@ -106,33 +106,33 @@ jobs:
             src/*.c \
             -L/mingw32/lib \
             -lgtk-3 -lgdk-3 -lgobject-2.0 -lglib-2.0 -lgio-2.0 -lpango-1.0 -lcairo -lgdk_pixbuf-2.0 -latk-1.0 -lpangocairo-1.0 -lpangoft2-1.0 -lepoxy
-          
+
           BUILD_EXIT_CODE=$?
-          
+
           if [ $BUILD_EXIT_CODE -ne 0 ]; then
             echo "ERROR: Build failed with exit code $BUILD_EXIT_CODE"
             exit 1
           fi
-          
+
           if [ ! -f bin/stock_management.exe ]; then
             echo "ERROR: Build failed - executable not created!"
             exit 1
           fi
-          
+
           echo "=== Build Verification ==="
           echo "Executable created successfully!"
           ls -lh bin/stock_management.exe
-          
+
           # Verify executable format
           echo "Checking executable format..."
           if command -v file &> /dev/null; then
             file bin/stock_management.exe || echo "file command failed"
           fi
-          
+
           # Use objdump to verify PE format and architecture
           echo "Verifying PE format and architecture:"
           objdump -f bin/stock_management.exe 2>/dev/null | head -10 || echo "objdump failed"
-          
+
           # Check if it's a valid PE file by checking magic bytes
           echo "Checking PE magic bytes..."
           HEX_MAGIC=$(head -c 2 bin/stock_management.exe | od -An -tx1 | tr -d ' \n')
@@ -142,7 +142,7 @@ jobs:
             echo "✗ WARNING: Invalid PE magic bytes: $HEX_MAGIC"
             echo "  Expected: 4d5a or 5a4d (MZ)"
           fi
-          
+
           # Verify it's 32-bit by checking PE header
           echo "Checking architecture..."
           ARCH_INFO=$(objdump -f bin/stock_management.exe 2>/dev/null | grep -i "architecture" || echo "")
@@ -172,11 +172,11 @@ jobs:
           echo "Finding all DLL dependencies..."
           # Use objdump to find all DLL dependencies
           DEPENDENCIES=$(objdump -p bin/stock_management.exe 2>/dev/null | grep "DLL Name:" | sed 's/.*DLL Name: //' | sort -u || echo "")
-          
+
           if [ -z "$DEPENDENCIES" ]; then
             echo "Warning: Could not extract dependencies automatically, using comprehensive manual list"
-            # Comprehensive manual list as fallback (includes MinGW runtime DLLs)
-            DEPENDENCIES="libgcc_s_dw2-1.dll libwinpthread-1.dll libgtk-3-0.dll libgdk-3-0.dll libglib-2.0-0.dll libgobject-2.0-0.dll libgio-2.0-0.dll libpango-1.0-0.dll libcairo-2.dll libpangoft2-1.0-0.dll libpangocairo-1.0-0.dll libgdk_pixbuf-2.0-0.dll libatk-1.0-0.dll libepoxy-0.dll libintl-8.dll libiconv-2.dll libffi-8.dll libbz2-1.dll libharfbuzz-0.dll libfreetype-6.dll libfontconfig-1.dll libpng16-16.dll libjpeg-8.dll libtiff-5.dll libpixman-1-0.dll libexpat-1.dll libzstd.dll liblzma-5.dll libz-1.dll"
+            # Comprehensive manual list as fallback (includes MinGW runtime DLLs and all Cairo DLLs)
+            DEPENDENCIES="libgcc_s_dw2-1.dll libwinpthread-1.dll libgtk-3-0.dll libgdk-3-0.dll libglib-2.0-0.dll libgobject-2.0-0.dll libgio-2.0-0.dll libpango-1.0-0.dll libcairo-2.dll libcairo-gobject-2.dll libpangoft2-1.0-0.dll libpangocairo-1.0-0.dll libgdk_pixbuf-2.0-0.dll libatk-1.0-0.dll libepoxy-0.dll libintl-8.dll libiconv-2.dll libffi-8.dll libbz2-1.dll libharfbuzz-0.dll libfreetype-6.dll libfontconfig-1.dll libpng16-16.dll libjpeg-8.dll libtiff-5.dll libpixman-1-0.dll libexpat-1.dll libzstd.dll liblzma-5.dll libz-1.dll"
           fi
 
           echo "Direct dependencies found:"
@@ -196,14 +196,37 @@ jobs:
 
           # Collect all DLLs to copy (direct + transitive)
           ALL_DLLS="$DEPENDENCIES"
-          
-          # Add transitive dependencies (one level deep)
+
+          # Add transitive dependencies (multiple levels deep)
           echo "Finding transitive dependencies..."
-          for dll in $DEPENDENCIES; do
-            TRANS_DEPS=$(find_dll_deps "$dll")
-            if [ -n "$TRANS_DEPS" ]; then
-              ALL_DLLS="$ALL_DLLS $TRANS_DEPS"
+          NEW_DLLS="$DEPENDENCIES"
+          ITERATION=0
+          MAX_ITERATIONS=3
+          
+          while [ $ITERATION -lt $MAX_ITERATIONS ]; do
+            ITERATION=$((ITERATION + 1))
+            echo "  Iteration $ITERATION: Finding dependencies..."
+            CURRENT_DLLS="$NEW_DLLS"
+            NEW_DLLS=""
+            
+            for dll in $CURRENT_DLLS; do
+              TRANS_DEPS=$(find_dll_deps "$dll")
+              if [ -n "$TRANS_DEPS" ]; then
+                for trans_dll in $TRANS_DEPS; do
+                  # Check if we already have this DLL
+                  if ! echo "$ALL_DLLS" | grep -q "$trans_dll"; then
+                    NEW_DLLS="$NEW_DLLS $trans_dll"
+                    ALL_DLLS="$ALL_DLLS $trans_dll"
+                  fi
+                done
+              fi
+            done
+            
+            if [ -z "$NEW_DLLS" ]; then
+              echo "  No new dependencies found, stopping."
+              break
             fi
+            echo "  Found $(echo $NEW_DLLS | wc -w) new dependencies"
           done
           
           # Remove duplicates and sort
@@ -243,6 +266,35 @@ jobs:
             fi
           done
 
+          # Copy all Cairo-related DLLs (CRITICAL - Cairo has multiple DLLs)
+          echo "Copying all Cairo DLLs..."
+          CAIRO_DLLS="libcairo-2.dll libcairo-gobject-2.dll libcairo-script-interpreter-2.dll"
+          for dll in $CAIRO_DLLS; do
+            if [ -f "$MSYS2_BIN/$dll" ]; then
+              cp "$MSYS2_BIN/$dll" bin/ && echo "✓ Copied Cairo DLL: $dll" || echo "✗ Failed: $dll"
+            else
+              echo "⚠ Cairo DLL not found: $dll (may not be needed)"
+            fi
+          done
+
+          # Copy all Pango-related DLLs (Pango has multiple DLLs)
+          echo "Copying all Pango DLLs..."
+          PANGO_DLLS="libpango-1.0-0.dll libpangocairo-1.0-0.dll libpangoft2-1.0-0.dll libpangowin32-1.0-0.dll"
+          for dll in $PANGO_DLLS; do
+            if [ -f "$MSYS2_BIN/$dll" ]; then
+              cp "$MSYS2_BIN/$dll" bin/ && echo "✓ Copied Pango DLL: $dll" || echo "✗ Failed: $dll"
+            fi
+          done
+
+          # Copy all GLib/GObject-related DLLs
+          echo "Copying all GLib/GObject DLLs..."
+          GLIB_DLLS="libglib-2.0-0.dll libgobject-2.0-0.dll libgio-2.0-0.dll libgmodule-2.0-0.dll libgthread-2.0-0.dll"
+          for dll in $GLIB_DLLS; do
+            if [ -f "$MSYS2_BIN/$dll" ]; then
+              cp "$MSYS2_BIN/$dll" bin/ && echo "✓ Copied GLib DLL: $dll" || echo "✗ Failed: $dll"
+            fi
+          done
+
           # Copy additional common DLLs that might be needed
           echo "Copying additional common DLLs..."
           ADDITIONAL_DLLS="libbrotlidec.dll libbrotlicommon.dll libgraphite2.dll libdatrie-1.dll libthai-0.dll libfribidi-0.dll"
@@ -252,7 +304,31 @@ jobs:
             fi
           done
           
-          # Verify critical MinGW runtime DLL is present
+          # Verify critical Cairo DLLs are present
+          echo ""
+          echo "Verifying Cairo DLLs..."
+          if [ -f "bin/libcairo-2.dll" ]; then
+            echo "✓ libcairo-2.dll found"
+          else
+            echo "✗ ERROR: libcairo-2.dll missing!"
+          fi
+          if [ -f "bin/libcairo-gobject-2.dll" ]; then
+            echo "✓ libcairo-gobject-2.dll found"
+          else
+            echo "✗ ERROR: libcairo-gobject-2.dll missing!"
+          fi
+
+          # Copy any remaining DLLs matching common GTK/Cairo patterns (safety net)
+          echo ""
+          echo "Copying any remaining GTK/Cairo/GLib DLLs (safety net)..."
+          PATTERN_DLLS=$(ls "$MSYS2_BIN"/lib{gtk,gdk,glib,gobject,gio,gmodule,gthread,cairo,pango,atk,epoxy,gdk_pixbuf}-*.dll 2>/dev/null | xargs -n1 basename 2>/dev/null || echo "")
+          for dll in $PATTERN_DLLS; do
+            if [ ! -f "bin/$dll" ] && [ -f "$MSYS2_BIN/$dll" ]; then
+              cp "$MSYS2_BIN/$dll" bin/ 2>/dev/null && echo "✓ Copied pattern match: $dll" || true
+            fi
+          done
+
+          # Verify critical DLLs are present
           echo ""
           echo "Verifying MinGW runtime DLLs..."
           if [ -f "bin/libgcc_s_dw2-1.dll" ]; then
@@ -316,7 +392,7 @@ jobs:
           fi
 
           echo "Checking for critical DLLs..."
-          CRITICAL_DLLS="libgcc_s_dw2-1.dll libwinpthread-1.dll libgtk-3-0.dll libglib-2.0-0.dll libgobject-2.0-0.dll"
+          CRITICAL_DLLS="libgcc_s_dw2-1.dll libwinpthread-1.dll libgtk-3-0.dll libglib-2.0-0.dll libgobject-2.0-0.dll libcairo-2.dll libcairo-gobject-2.dll"
           MISSING_CRITICAL=0
           for dll in $CRITICAL_DLLS; do
             if [ -f "bin/$dll" ]; then
@@ -326,7 +402,7 @@ jobs:
               MISSING_CRITICAL=$((MISSING_CRITICAL + 1))
             fi
           done
-          
+
           if [ $MISSING_CRITICAL -gt 0 ]; then
             echo ""
             echo "⚠ WARNING: $MISSING_CRITICAL critical DLL(s) missing!"
@@ -335,7 +411,7 @@ jobs:
 
           echo "Verifying executable format..."
           file bin/stock_management.exe || echo "file command not available"
-          
+
           # Verify DLL dependencies can be resolved
           echo "Checking DLL dependencies..."
           MISSING_DLLS=""
@@ -344,14 +420,14 @@ jobs:
               MISSING_DLLS="$MISSING_DLLS $dll"
             fi
           done
-          
+
           if [ -n "$MISSING_DLLS" ]; then
             echo "⚠ WARNING: Missing DLLs in bin directory:"
             echo "$MISSING_DLLS"
           else
             echo "✓ All non-system DLLs are present in bin directory"
           fi
-          
+
           # List all DLLs in bin
           echo ""
           echo "DLLs in bin directory:"
@@ -414,7 +490,19 @@ jobs:
           ) else (
             echo [WARN] libwinpthread-1.dll missing
           )
-          
+          echo.
+          echo Checking for Cairo DLLs...
+          if exist bin\libcairo-2.dll (
+            echo [OK] libcairo-2.dll found
+          ) else (
+            echo [ERROR] libcairo-2.dll MISSING!
+          )
+          if exist bin\libcairo-gobject-2.dll (
+            echo [OK] libcairo-gobject-2.dll found
+          ) else (
+            echo [ERROR] libcairo-gobject-2.dll MISSING - Application will not run!
+          )
+
       - name: Create Installer
         shell: cmd
         run: |
@@ -423,7 +511,7 @@ jobs:
           ) else if exist StockManagement_Installer.iss (
             "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" StockManagement_Installer.iss
           )
-          
+
       - name: Verify Installer Contents
         shell: cmd
         run: |
